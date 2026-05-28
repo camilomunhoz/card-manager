@@ -1,12 +1,28 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import { supabaseBrowser } from "@/lib/supabaseBrowser";
+import Toast from "@/components/Toast";
 
 export default function Home() {
   const router = useRouter();
   const [roomCode, setRoomCode] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimer = useRef<number | null>(null);
+
+  const showToast = useCallback((message: string) => {
+    setToastMessage(message);
+    if (toastTimer.current) {
+      window.clearTimeout(toastTimer.current);
+    }
+    toastTimer.current = window.setTimeout(() => {
+      setToastMessage(null);
+      toastTimer.current = null;
+    }, 2200);
+  }, []);
 
   const createRoom = async () => {
     setIsCreating(true);
@@ -21,20 +37,33 @@ export default function Home() {
     }
   };
 
-  const joinRoom = () => {
+  const joinRoom = async () => {
     if (!roomCode.trim()) return;
-    router.push(`/room/${roomCode.trim()}`);
+    setIsJoining(true);
+    try {
+      const { error } = await supabaseBrowser
+        .from("rooms")
+        .select("id")
+        .eq("id", roomCode.trim())
+        .single();
+      if (error) {
+        showToast("Sala não encontrada.");
+        return;
+      }
+      router.push(`/room/${roomCode.trim()}`);
+    } finally {
+      setIsJoining(false);
+    }
   };
 
   return (
     <div className="flex flex-1 items-center justify-center px-6 py-16">
       <main className="w-full max-w-3xl rounded-3xl border border-white/10 bg-black/40 p-10 shadow-[0_25px_80px_rgba(0,0,0,0.45)] backdrop-blur">
         <p className="font-display text-5xl uppercase tracking-wide text-white">
-          Card Arena
+          Playtest <small className="ml-5">Freud Explica - Versão Medieval</small>
         </p>
         <p className="mt-3 max-w-xl text-base text-[color:var(--muted)]">
-          Crie uma sala, compartilhe o codigo e comece o playtest. Sem turnos,
-          sem travas, com feedback instantaneo.
+          Enquanto não temos 23874239 cartas de ação impressas, vamos usar esse carinha aqui para simular o baralho.
         </p>
         <div className="mt-10 grid gap-6 md:grid-cols-2">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
@@ -42,7 +71,7 @@ export default function Home() {
               Nova Sala
             </h2>
             <p className="mt-2 text-sm text-[color:var(--muted)]">
-              O baralho eh inicializado automaticamente.
+              O baralho é inicializado automaticamente.
             </p>
             <button
               onClick={createRoom}
@@ -59,21 +88,26 @@ export default function Home() {
             <p className="mt-2 text-sm text-[color:var(--muted)]">
               Digite o codigo para entrar em uma sala existente.
             </p>
-            <input
-              value={roomCode}
-              onChange={(event) => setRoomCode(event.target.value)}
-              placeholder="ROOM-1234"
-              className="mt-6 w-full rounded-full border border-white/20 bg-black/30 px-4 py-3 text-sm uppercase tracking-widest text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[color:var(--accent)]"
-            />
+            <div className="mt-6 flex w-full items-center rounded-full border border-white/20 bg-black/30">
+              <span className="pl-4 text-sm uppercase tracking-widest text-white/60">ROOM-</span>
+              <input
+                value={roomCode.replace("ROOM-", "")}
+                onChange={(event) => setRoomCode("ROOM-" + event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
+                placeholder="1234"
+                className="flex-1 bg-transparent pl-0 pr-2 py-3 text-sm uppercase tracking-widest text-white placeholder:text-white/40 focus:outline-none"
+              />
+            </div>
             <button
               onClick={joinRoom}
-              className="mt-4 w-full rounded-full border border-white/20 px-5 py-3 text-sm font-semibold uppercase tracking-wide text-white transition hover:border-[color:var(--accent)]"
+              disabled={isJoining}
+              className="mt-4 w-full rounded-full border border-white/20 px-5 py-3 text-sm font-semibold uppercase tracking-wide text-white transition hover:border-[color:var(--accent)] disabled:opacity-70"
             >
-              Entrar na Sala
+              {isJoining ? "Verificando..." : "Entrar na Sala"}
             </button>
           </div>
         </div>
       </main>
+      <Toast message={toastMessage} />
     </div>
   );
 }

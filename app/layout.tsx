@@ -16,7 +16,7 @@ const bebasNeue = Bebas_Neue({
 });
 
 export const metadata: Metadata = {
-  title: "Card Arena",
+  title: "Playtest - Freud Explica Versão Medieval",
   description: "Multiplayer card game playtest tool",
 };
 

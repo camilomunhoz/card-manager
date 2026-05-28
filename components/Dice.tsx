@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { useRef, useState } from "react";
 
-const outcomes = ["+Eco", "+Motivacao", "+Regeneracao"] as const;
+const outcomes = ["+Eco", "+Motiv.", "+Regen."] as const;
 
 interface DiceProps {
   /** Dice size in pixels (square). Default 128. */

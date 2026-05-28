@@ -24,7 +24,7 @@ function PlayerSeat({ player, displayName, isSelf, seatScale, cardScale, onClick
       style={{ transform: `scale(${seatScale * selfScale})`, transformOrigin: "center" }}
       onClick={onClickHand}
     >
-      <span className="mb-2 whitespace-nowrap text-[10px] uppercase tracking-[0.2em] text-white/70">
+      <span className="mb-[-16] whitespace-nowrap text-[10px] uppercase tracking-[0.2em] text-white/70">
         {displayName}
       </span>
 

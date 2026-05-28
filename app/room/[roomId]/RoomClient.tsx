@@ -336,8 +336,10 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       <div className="absolute left-4 top-4 z-40">
         <button
           onClick={() => setMenuOpen((open) => !open)}
-          className="flex h-10 w-10 items-center justify-center rounded-full border border-white/20 bg-black/40"
+          className="flex h-10 w-10 flex-col items-center justify-center gap-1 rounded-full border border-white/20 bg-black/40"
         >
+          <span className="h-0.5 w-4 bg-white" />
+          <span className="h-0.5 w-4 bg-white" />
           <span className="h-0.5 w-4 bg-white" />
         </button>
         <AnimatePresence>
@@ -348,6 +350,10 @@ export default function RoomClient({ roomId }: RoomClientProps) {
               exit={{ opacity: 0, y: -8 }}
               className="mt-3 w-48 rounded-2xl border border-white/10 bg-black/80 p-3 text-sm text-white"
             >
+              <p className="mb-2 text-center text-xs uppercase tracking-widest text-white/50">
+                {roomId}
+              </p>
+              <div className="mb-2 h-px bg-white/10" />
               <button
                 onClick={() => router.push("/")}
                 className="w-full rounded-lg px-3 py-2 text-left hover:bg-white/10"
