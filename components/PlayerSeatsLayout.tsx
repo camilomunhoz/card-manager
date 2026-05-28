@@ -1,17 +1,19 @@
 "use client";
 
 import type { PlayerState } from "@/lib/types";
-import GameCard from "./GameCard";
+import type { GameScale } from "@/hooks/useGameScale";
+import ScaledCard from "./ScaledCard";
 
 interface PlayerSeatProps {
   player: PlayerState;
   displayName: string;
   isSelf: boolean;
-  scale: number;
+  seatScale: number;
+  cardScale: number;
   onClickHand?: () => void;
 }
 
-function PlayerSeat({ player, displayName, isSelf, scale, onClickHand }: PlayerSeatProps) {
+function PlayerSeat({ player, displayName, isSelf, seatScale, cardScale, onClickHand }: PlayerSeatProps) {
   const cards = player.hand ?? [];
   const visible = cards.slice(0, 8);
   const selfScale = isSelf ? 1.5 : 1;
@@ -19,14 +21,14 @@ function PlayerSeat({ player, displayName, isSelf, scale, onClickHand }: PlayerS
   return (
     <div
       className={`flex flex-col items-center ${isSelf ? "cursor-pointer" : "pointer-events-none"}`}
-      style={{ transform: `scale(${scale * selfScale})`, transformOrigin: "center" }}
+      style={{ transform: `scale(${seatScale * selfScale})`, transformOrigin: "center" }}
       onClick={onClickHand}
     >
       <span className="mb-2 whitespace-nowrap text-[10px] uppercase tracking-[0.2em] text-white/70">
         {displayName}
       </span>
 
-      <div className="relative h-24 w-44">
+      <div className="relative" style={{ width: 240 * cardScale, height: 144 * cardScale + 32 }}>
         {visible.length === 0 ? (
           <span className="text-[10px] uppercase tracking-widest text-white/30">
             Sem cartas
@@ -44,7 +46,7 @@ function PlayerSeat({ player, displayName, isSelf, scale, onClickHand }: PlayerS
                   transformOrigin: "bottom center",
                 }}
               >
-                <GameCard card={card} isFaceUp={false} size="sm" />
+                <ScaledCard card={card} isFaceUp={false} scale={cardScale} />
               </div>
             );
           })
@@ -80,9 +82,9 @@ function computeSeats(count: number): SeatSlot[] {
   ];
 }
 
-function computeScale(sectionW: number, sectionH: number): number {
+function computeScale(sectionW: number, sectionH: number, gameScale: GameScale): number {
   if (!sectionW || !sectionH) return 1;
-  return Math.max(0.45, Math.min(1, Math.min(sectionW, sectionH) / 800));
+  return Math.max(0.4, Math.min(1, gameScale.scale * 1.2));
 }
 
 /* ------------------------------------------------------------------ */
@@ -95,6 +97,7 @@ interface PlayerSeatsLayoutProps {
   playerName: string;
   handCardsLength: number;
   viewport: { width: number; height: number };
+  gameScale: GameScale;
   onOpenHand: () => void;
 }
 
@@ -104,10 +107,14 @@ export default function PlayerSeatsLayout({
   playerName,
   handCardsLength,
   viewport,
+  gameScale,
   onOpenHand,
 }: PlayerSeatsLayoutProps) {
   const seats = computeSeats(orderedPlayers.length);
-  const scale = computeScale(viewport.width / 2, viewport.height);
+  const seatScale = computeScale(viewport.width / 2, viewport.height, gameScale);
+
+  // Fan cards scale down further — single point of control
+  const fanCardScale = Math.round(gameScale.scale * 55) / 100;
 
   return (
     <>
@@ -136,7 +143,8 @@ export default function PlayerSeatsLayout({
               player={seatPlayer}
               displayName={label}
               isSelf={isSelf}
-              scale={scale}
+              seatScale={seatScale}
+              cardScale={fanCardScale}
             />
           </div>
         );

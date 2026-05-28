@@ -1,11 +1,18 @@
 "use client";
 
-export default function DeckPile({ onClick }: { onClick?: () => void }) {
+interface DeckPileProps {
+  /** Pixel dimensions – pass from useGameScale */
+  w?: number;
+  h?: number;
+  onClick?: () => void;
+}
+
+export default function DeckPile({ w = 240, h = 144, onClick }: DeckPileProps) {
   return (
     <button
       onClick={onClick}
       className="relative"
-      style={{ width: 240, height: 144 }}
+      style={{ width: w, height: h }}
       aria-label="Comprar carta do monte"
     >
       <div className="absolute left-2 top-2 h-full w-full rounded-lg bg-black/60 shadow-[0_10px_20px_rgba(0,0,0,0.5)]" />

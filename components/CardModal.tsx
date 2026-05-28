@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { CardData } from "@/lib/types";
 import ScaledCard from "./ScaledCard";
@@ -14,8 +15,6 @@ interface CardModalProps {
   onConfirm?: () => void;
 }
 
-const MODAL_ZOOM = 2.5;
-
 export default function CardModal({
   card,
   isOpen,
@@ -25,6 +24,16 @@ export default function CardModal({
   onClose,
   onConfirm,
 }: CardModalProps) {
+  const [zoom, setZoom] = useState(2.5);
+
+  useEffect(() => {
+    const update = () => {
+      setZoom(Math.min(3, window.innerWidth / 240, window.innerHeight / 144));
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
   return (
     <AnimatePresence>
       {isOpen && (
@@ -47,7 +56,7 @@ export default function CardModal({
               card={card}
               isFaceUp={!showBackOnly}
               disableFlip={disableFlip}
-              scale={MODAL_ZOOM}
+              scale={zoom}
               layoutId={card ? `card-${card.id}` : undefined}
             />
             <div className="relative z-50 flex gap-3">

@@ -7,17 +7,13 @@ interface GameCardProps {
   card: CardData | null;
   isFaceUp?: boolean;
   disableFlip?: boolean;
-  size?: "sm" | "md" | "lg";
   onClick?: () => void;
   layoutId?: string;
   className?: string;
 }
 
-const SIZE_MAP = {
-  sm: { w: 160, h: 96 },
-  md: { w: 240, h: 144 },
-  lg: { w: 360, h: 216 },
-} as const;
+const CARD_W = 240;
+const CARD_H = 144;
 
 const CLASS_PATTERN: Record<string, string> = {
   Resiliente: "/patterns/pattern-resiliente.png",
@@ -29,13 +25,11 @@ export default function GameCard({
   card,
   isFaceUp = true,
   disableFlip = false,
-  size = "md",
   onClick,
   layoutId,
   className = "",
 }: GameCardProps) {
   const rotation = isFaceUp ? 180 : 0;
-  const { w: CARD_W, h: CARD_H } = SIZE_MAP[size];
   return (
     <motion.div
       layoutId={layoutId}

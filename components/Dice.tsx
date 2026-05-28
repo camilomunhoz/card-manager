@@ -5,7 +5,12 @@ import { useRef, useState } from "react";
 
 const outcomes = ["+Eco", "+Motivacao", "+Regeneracao"] as const;
 
-export default function Dice() {
+interface DiceProps {
+  /** Dice size in pixels (square). Default 128. */
+  size?: number;
+}
+
+export default function Dice({ size = 128 }: DiceProps) {
   const [value, setValue] = useState<string | null>(null);
   const [isRolling, setIsRolling] = useState(false);
   const timerRef = useRef<number | null>(null);
@@ -43,7 +48,8 @@ export default function Dice() {
             }
           : undefined
       }
-      className="flex h-32 w-32 flex-col items-center justify-center rounded-3xl border border-white/20 bg-white/5 text-center text-sm uppercase tracking-widest text-white shadow-[0_20px_40px_rgba(0,0,0,0.35)] disabled:opacity-70"
+      style={{ width: size, height: size }}
+      className="flex flex-col items-center justify-center rounded-3xl border border-white/20 bg-white/5 text-center text-sm uppercase tracking-widest text-white shadow-[0_20px_40px_rgba(0,0,0,0.35)] disabled:opacity-70"
     >
       <span className="text-xs text-white/60">Dado</span>
       <span className="mt-2 font-display text-2xl">

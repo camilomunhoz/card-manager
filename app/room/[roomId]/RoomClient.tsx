@@ -19,12 +19,13 @@ import {
 } from "@/lib/roomApi";
 import Dice from "@/components/Dice";
 import DeckPile from "@/components/DeckPile";
-import GameCard from "@/components/GameCard";
+import ScaledCard from "@/components/ScaledCard";
 import CardModal from "@/components/CardModal";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import Toast from "@/components/Toast";
 import PlayerSeatsLayout from "@/components/PlayerSeatsLayout";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import { useGameScale } from "@/hooks/useGameScale";
 
 interface RoomClientProps {
   roomId: string;
@@ -275,6 +276,8 @@ export default function RoomClient({ roomId }: RoomClientProps) {
 
   const handCards = player?.hand ?? [];
 
+  const gs = useGameScale(viewport);
+
   const orderedPlayers = useMemo(() => {
     if (!room) return [] as PlayerState[];
     const entries = Object.values(room.players);
@@ -375,7 +378,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
         <section className="relative flex h-full flex-col items-center justify-center border-r border-white/10">
           <div className="relative flex h-full w-full items-center justify-center">
             <div className="relative z-10">
-              <Dice />
+              <Dice size={gs.diceSize} />
             </div>
 
             <div className="absolute inset-0">
@@ -385,6 +388,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                 playerName={playerName}
                 handCardsLength={handCards.length}
                 viewport={viewport}
+                gameScale={gs}
                 onOpenHand={() => {
                   if (handCards.length === 0) return;
                   setIsHandOpen((open) => !open);
@@ -419,7 +423,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                       className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-3"
                     >
                       <div className="flex-shrink-0" onClick={() => setSelectedCard(card)}>
-                        <GameCard card={card} size="md" />
+                        <ScaledCard card={card} scale={gs.scale} />
                       </div>
                       <div className="flex flex-1 flex-col gap-2">
                         <p className="font-display text-2xl uppercase tracking-wide text-white">
@@ -453,9 +457,11 @@ export default function RoomClient({ roomId }: RoomClientProps) {
           </AnimatePresence>
         </section>
 
-        <section className="relative flex h-full flex-col items-center justify-center gap-6 p-8">
-          <div className="flex flex-col items-center gap-3">
+        <section className="relative flex h-full flex-col items-center justify-center gap-4 p-4">
+          <div className="flex flex-col items-center gap-2">
             <DeckPile
+              w={gs.deckW}
+              h={gs.deckH}
               onClick={() => {
                 setDeckRevealCard(null);
                 setDeckModalOpen(true);
@@ -463,13 +469,19 @@ export default function RoomClient({ roomId }: RoomClientProps) {
             />
           </div>
 
-          <div className="grid w-full max-w-lg grid-cols-2 place-items-center gap-4">
+          <div
+            className="grid w-full place-items-center gap-3"
+            style={{
+              gridTemplateColumns: `repeat(2, ${Math.round(240 * gs.scale)}px)`,
+              maxWidth: Math.round(240 * gs.scale) * 2 + 16,
+            }}
+          >
             {(room?.market_cards || new Array(4).fill(null)).map((card, index) => (
-              <GameCard
+              <ScaledCard
                 key={card?.id ?? `empty-${index}`}
                 card={card}
                 isFaceUp={Boolean(card)}
-                size="md"
+                scale={gs.scale}
                 onClick={() => {
                   if (!card) return;
                   setSelectedMarketIndex(index);
@@ -481,7 +493,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
 
           <button
             onClick={() => setConfirmRefresh(true)}
-            className="rounded-full border border-white/20 px-6 py-2 text-xs font-semibold uppercase tracking-wide text-white"
+            className="rounded-full border border-white/20 px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-white"
           >
             Repor Mercado
           </button>
@@ -580,7 +592,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                               setSelectedCard(card);
                             }}
                           >
-                            <GameCard card={card} size="sm" />
+                            <ScaledCard card={card} scale={0.67} />
                             <div className="flex flex-col gap-2">
                               <p className="text-xs uppercase tracking-widest text-white/70">
                                 {count} cópias
