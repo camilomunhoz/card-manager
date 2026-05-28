@@ -42,5 +42,5 @@ export async function POST(request: Request) {
     .update({ deck_queue: rest, players })
     .eq("id", room.id);
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, card });
 }

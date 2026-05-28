@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import Papa from "papaparse";
 import type { CardClass, CardData } from "./types";
 
@@ -8,7 +9,12 @@ const classMap: Record<string, CardClass> = {
 };
 
 const normalizeKey = (value: string) =>
-  value.trim().toLowerCase().replace(/\s+/g, "_");
+  value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, "_");
 
 type CsvRow = Record<string, string>;
 
@@ -35,7 +41,11 @@ export const parseCsvToDeck = async (csvText: string) => {
     const classe = classMap[classeRaw.toLowerCase()];
     const custo = Number(normalized.custo || "0");
     const titulo = normalized.titulo || normalized.title || `Carta ${index + 1}`;
-    const descricao = normalized.descricao || normalized.description || "";
+    const descricao =
+      normalized.descricao ||
+      normalized.habilidade ||
+      normalized.description ||
+      "";
     const condicao = normalized.condicao || normalized.condicion || "";
     const quantidade = Number(normalized.quantidade || "1") || 1;
 
@@ -43,7 +53,7 @@ export const parseCsvToDeck = async (csvText: string) => {
 
     for (let i = 0; i < quantidade; i += 1) {
       deck.push({
-        id: crypto.randomUUID(),
+        id: randomUUID(),
         classe,
         custo,
         titulo,

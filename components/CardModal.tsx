@@ -2,20 +2,26 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import type { CardData } from "@/lib/types";
-import GameCard from "./GameCard";
+import ScaledCard from "./ScaledCard";
 
 interface CardModalProps {
   card: CardData | null;
   isOpen: boolean;
   actionLabel?: string;
+  showBackOnly?: boolean;
+  disableFlip?: boolean;
   onClose: () => void;
   onConfirm?: () => void;
 }
+
+const MODAL_ZOOM = 2.5;
 
 export default function CardModal({
   card,
   isOpen,
   actionLabel,
+  showBackOnly = false,
+  disableFlip = false,
   onClose,
   onConfirm,
 }: CardModalProps) {
@@ -23,21 +29,28 @@ export default function CardModal({
     <AnimatePresence>
       {isOpen && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur"
+          className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/80 backdrop-blur"
+          onClick={onClose}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
           <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            className="flex w-[min(90vw,520px)] flex-col items-center gap-6"
+            onClick={(event) => event.stopPropagation()}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 12 }}
+            className="flex flex-col items-center gap-6"
+            transition={{ duration: 0.25, ease: "easeOut" }}
           >
-            <div className="w-full" style={{ transform: "scale(1.5)" }}>
-              <GameCard card={card} />
-            </div>
-            <div className="flex gap-3">
+            <ScaledCard
+              card={card}
+              isFaceUp={!showBackOnly}
+              disableFlip={disableFlip}
+              scale={MODAL_ZOOM}
+              layoutId={card ? `card-${card.id}` : undefined}
+            />
+            <div className="relative z-50 flex gap-3">
               {onConfirm && actionLabel && (
                 <button
                   onClick={onConfirm}

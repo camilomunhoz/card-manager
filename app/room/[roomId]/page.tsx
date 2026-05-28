@@ -1,5 +1,10 @@
-import RoomClient from "./RoomClient";
+import RoomShell from "./RoomShell";
 
-export default function RoomPage({ params }: { params: { roomId: string } }) {
-  return <RoomClient roomId={params.roomId} />;
+export default async function RoomPage({
+  params,
+}: {
+  params: Promise<{ roomId: string }>;
+}) {
+  const { roomId } = await params;
+  return <RoomShell roomId={roomId} />;
 }

@@ -26,11 +26,13 @@ export default function ConfirmDialog({
       {isOpen && (
         <motion.div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur"
+          onClick={onCancel}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
           <motion.div
+            onClick={(event) => event.stopPropagation()}
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}

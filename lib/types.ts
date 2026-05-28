@@ -11,7 +11,9 @@ export interface CardData {
 
 export interface PlayerState {
   id: string;
+  name: string;
   hand: CardData[];
+  joinedAt: number;
 }
 
 export interface RoomState {

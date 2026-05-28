@@ -6,9 +6,12 @@ export async function POST(request: Request) {
   const body = (await request.json()) as {
     roomId?: string;
     playerId?: string;
+    playerName?: string;
   };
 
-  if (!body.roomId || !body.playerId) {
+  const name = body.playerName?.trim();
+
+  if (!body.roomId || !body.playerId || !name) {
     return NextResponse.json({ error: "Missing data" }, { status: 400 });
   }
 
@@ -23,13 +26,28 @@ export async function POST(request: Request) {
   }
 
   const room = data as RoomState;
-  if (!room.players[body.playerId]) {
-    const player: PlayerState = { id: body.playerId, hand: [] };
+  const existing = room.players[body.playerId];
+  if (!existing) {
+    const player: PlayerState = {
+      id: body.playerId,
+      name,
+      hand: [],
+      joinedAt: Date.now(),
+    };
     const players = { ...room.players, [body.playerId]: player };
-    await supabaseAdmin
-      .from("rooms")
-      .update({ players })
-      .eq("id", room.id);
+    await supabaseAdmin.from("rooms").update({ players }).eq("id", room.id);
+  } else {
+    const needsNameUpdate = existing.name !== name;
+    const needsJoinUpdate = !Number.isFinite(existing.joinedAt);
+    if (needsNameUpdate || needsJoinUpdate) {
+      const player: PlayerState = {
+        ...existing,
+        name,
+        joinedAt: needsJoinUpdate ? Date.now() : existing.joinedAt,
+      };
+      const players = { ...room.players, [body.playerId]: player };
+      await supabaseAdmin.from("rooms").update({ players }).eq("id", room.id);
+    }
   }
 
   return NextResponse.json({ ok: true });

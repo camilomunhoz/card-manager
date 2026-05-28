@@ -1,8 +1,12 @@
-export const joinRoom = async (roomId: string, playerId: string) =>
+export const joinRoom = async (
+  roomId: string,
+  playerId: string,
+  playerName: string
+) =>
   fetch("/api/rooms/join", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ roomId, playerId }),
+    body: JSON.stringify({ roomId, playerId, playerName }),
   });
 
 export const drawFromDeck = async (roomId: string, playerId: string) =>

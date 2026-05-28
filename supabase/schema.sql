@@ -12,3 +12,11 @@ alter table public.rooms enable row level security;
 create policy "rooms_read_all" on public.rooms
   for select
   using (true);
+
+create policy "rooms_insert_all" on public.rooms
+  for insert
+  with check (true);
+
+create policy "rooms_update_all" on public.rooms
+  for update
+  using (true);

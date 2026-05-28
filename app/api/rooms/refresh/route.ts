@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import type { RoomState } from "@/lib/types";
+import type { CardData, RoomState } from "@/lib/types";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { fillMarket } from "@/lib/cards";
 
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   }
 
   const room = data as RoomState;
-  const marketToDeck = room.market_cards.filter(Boolean);
+  const marketToDeck = room.market_cards.filter((c): c is CardData => Boolean(c));
   const deck_queue = [...room.deck_queue, ...marketToDeck];
 
   const { market, remaining } = fillMarket(deck_queue, 4);
