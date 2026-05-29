@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { CardData } from "@/lib/types";
+import type { CardRenderMode } from "./GameCard";
 import ScaledCard from "./ScaledCard";
 
 interface CardModalProps {
@@ -11,6 +12,7 @@ interface CardModalProps {
   actionLabel?: string;
   showBackOnly?: boolean;
   disableFlip?: boolean;
+  renderMode?: CardRenderMode;
   onClose: () => void;
   onConfirm?: () => void;
 }
@@ -21,6 +23,7 @@ export default function CardModal({
   actionLabel,
   showBackOnly = false,
   disableFlip = false,
+  renderMode = "safe",
   onClose,
   onConfirm,
 }: CardModalProps) {
@@ -58,22 +61,27 @@ export default function CardModal({
               disableFlip={disableFlip}
               scale={zoom}
               layoutId={card ? `card-${card.id}` : undefined}
+              renderMode={renderMode}
             />
             <div className="relative z-50 flex gap-3">
               {onConfirm && actionLabel && (
-                <button
+                <motion.button
                   onClick={onConfirm}
-                  className="rounded-full bg-[color:var(--accent)] px-6 py-3 text-xs font-semibold uppercase tracking-wide text-black"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.96 }}
+                  className="cursor-pointer rounded-full bg-[color:var(--accent)] px-6 py-3 text-xs font-semibold uppercase tracking-wide text-black"
                 >
                   {actionLabel}
-                </button>
+                </motion.button>
               )}
-              <button
+              <motion.button
                 onClick={onClose}
-                className="rounded-full border border-white/20 px-6 py-3 text-xs font-semibold uppercase tracking-wide text-white"
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.96 }}
+                className="cursor-pointer rounded-full border border-white/20 px-6 py-3 text-xs font-semibold uppercase tracking-wide text-white"
               >
                 Fechar
-              </button>
+              </motion.button>
             </div>
           </motion.div>
         </motion.div>

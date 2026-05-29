@@ -3,17 +3,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import type { CardData, PlayerState, RoomState } from "@/lib/types";
+import type { CardRenderMode } from "@/components/GameCard";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import {
   getOrCreatePlayerId,
   getStoredPlayerName,
+  getStoredPlayerColor,
   setStoredPlayerName,
+  setStoredPlayerColor,
 } from "@/lib/playerId";
 import {
   buyFromMarket,
   drawFromDeck,
   joinRoom,
+  rollDice,
+  setPlayerColor,
   refreshMarket,
   returnCard,
 } from "@/lib/roomApi";
@@ -26,6 +32,12 @@ import Toast from "@/components/Toast";
 import PlayerSeatsLayout from "@/components/PlayerSeatsLayout";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { useGameScale } from "@/hooks/useGameScale";
+import type { DiceRollState } from "@/lib/types";
+import {
+  DEFAULT_PLAYER_COLOR,
+  getPlayerColorInfo,
+  PLAYER_COLORS,
+} from "@/lib/playerColors";
 
 interface RoomClientProps {
   roomId: string;
@@ -37,11 +49,13 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const [playerId, setPlayerId] = useState<string>("");
   const [playerName, setPlayerName] = useState<string>("");
   const [nameDraft, setNameDraft] = useState<string>("");
+  const [colorDraft, setColorDraft] = useState<string>(DEFAULT_PLAYER_COLOR);
   const [namePromptOpen, setNamePromptOpen] = useState(false);
   const [isHandOpen, setIsHandOpen] = useState(false);
   const [portrait, setPortrait] = useState(false);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [menuOpen, setMenuOpen] = useState(false);
+  const [cardRenderMode, setCardRenderMode] = useState<CardRenderMode>("safe");
   const [selectedCard, setSelectedCard] = useState<CardData | null>(null);
   const [selectedMarketIndex, setSelectedMarketIndex] = useState<number | null>(
     null
@@ -57,6 +71,12 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimer = useRef<number | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
+  const [isDiceRolling, setIsDiceRolling] = useState(false);
+  const [diceRoll, setDiceRoll] = useState<DiceRollState | null>(null);
+  const roomChannelRef = useRef<RealtimeChannel | null>(null);
+  const diceRollTimerRef = useRef<number | null>(null);
+  const pendingDiceRollRef = useRef<DiceRollState | null>(null);
+  const colorRecheckTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     const id = getOrCreatePlayerId();
@@ -70,6 +90,17 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     }
   }, []);
 
+  useEffect(() => {
+    const storedMode = window.localStorage.getItem("card-render-mode");
+    if (storedMode === "safe" || storedMode === "classic") {
+      setCardRenderMode(storedMode);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("card-render-mode", cardRenderMode);
+  }, [cardRenderMode]);
+
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
     if (toastTimer.current) {
@@ -80,17 +111,6 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       toastTimer.current = null;
     }, 2200);
   }, []);
-
-  const commitPlayerName = useCallback(() => {
-    const next = nameDraft.trim();
-    if (!next) {
-      showToast("Informe um nome.");
-      return;
-    }
-    setStoredPlayerName(next);
-    setPlayerName(next);
-    setNamePromptOpen(false);
-  }, [nameDraft, showToast]);
 
   const beginAction = useCallback(() => {
     setPendingCount((count) => count + 1);
@@ -146,17 +166,60 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     if (data) setRoom(data as RoomState);
   }, [roomId]);
 
+  const joinProfile = useCallback(
+    async (nextName: string, nextColor: string) => {
+      if (!playerId) return;
+      if (!roomId || roomId === "undefined") {
+        showToast("Codigo de sala invalido.");
+        return;
+      }
+
+      await withLoading(async () => {
+        const joinResponse = await joinRoom(roomId, playerId, nextName);
+        const joinFailed = await handleResponseError(joinResponse);
+        if (joinFailed) return;
+
+        const colorResponse = await setPlayerColor(roomId, playerId, nextColor);
+        const colorFailed = await handleResponseError(colorResponse);
+        if (colorFailed) return;
+
+        fetchRoom();
+
+        if (colorRecheckTimerRef.current) {
+          window.clearTimeout(colorRecheckTimerRef.current);
+        }
+        colorRecheckTimerRef.current = window.setTimeout(() => {
+          void (async () => {
+            const recheckResponse = await setPlayerColor(roomId, playerId, nextColor);
+            const recheckFailed = await handleResponseError(recheckResponse);
+            if (!recheckFailed) {
+              fetchRoom();
+            }
+          })();
+          colorRecheckTimerRef.current = null;
+        }, 5000);
+      });
+    },
+    [fetchRoom, handleResponseError, playerId, roomId, showToast, withLoading]
+  );
+
   useEffect(() => {
-    if (!playerId || !playerName) return;
-    if (!roomId || roomId === "undefined") {
-      showToast("Codigo de sala invalido.");
+    if (!playerId) return;
+
+    const storedName = getStoredPlayerName();
+    const storedColor = getStoredPlayerColor();
+
+    if (storedName) {
+      setPlayerName(storedName);
+      setNameDraft(storedName);
+      setColorDraft(storedColor || DEFAULT_PLAYER_COLOR);
+      void joinProfile(storedName, storedColor || DEFAULT_PLAYER_COLOR);
       return;
     }
-    withLoading(async () => {
-      const response = await joinRoom(roomId, playerId, playerName);
-      await handleResponseError(response);
-    });
-  }, [playerId, playerName, roomId, showToast]);
+
+    setColorDraft(DEFAULT_PLAYER_COLOR);
+    setNamePromptOpen(true);
+  }, [joinProfile, playerId]);
 
   useEffect(() => {
     if (!roomId || roomId === "undefined") return;
@@ -166,16 +229,34 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     const channel = supabaseBrowser
       .channel(`rooms:${roomId}`)
       .on(
+        "broadcast",
+        { event: "dice_roll" },
+        ({ payload }) => {
+          const roll = payload as DiceRollState | null;
+          if (roll) {
+            setDiceRoll(roll);
+          }
+        }
+      )
+      .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "rooms", filter: `id=eq.${roomId}` },
-        (payload) => {
-          if (payload.new) setRoom(payload.new as RoomState);
+        () => {
+          void fetchRoom();
         }
       )
       .subscribe();
 
+    roomChannelRef.current = channel;
+
+    const pollId = window.setInterval(() => {
+      void fetchRoom();
+    }, 2000);
+
     return () => {
+      window.clearInterval(pollId);
       supabaseBrowser.removeChannel(channel);
+      roomChannelRef.current = null;
     };
   }, [fetchRoom, roomId]);
 
@@ -205,6 +286,72 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     request();
   }, []);
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+
+      if (allCardsOpen) {
+        setAllCardsOpen(false);
+        return;
+      }
+
+      if (colorRecheckTimerRef.current) {
+        window.clearTimeout(colorRecheckTimerRef.current);
+        colorRecheckTimerRef.current = null;
+      }
+
+      if (namePromptOpen) {
+        setNamePromptOpen(false);
+        return;
+      }
+
+      if (selectedCard) {
+        setSelectedCard(null);
+        setSelectedMarketIndex(null);
+        return;
+      }
+
+      if (deckModalOpen) {
+        setDeckModalOpen(false);
+        setDeckRevealCard(null);
+        return;
+      }
+
+      if (confirmReturn) {
+        setConfirmReturn(null);
+        return;
+      }
+
+      if (confirmRefresh) {
+        setConfirmRefresh(false);
+        return;
+      }
+
+      if (isHandOpen) {
+        setIsHandOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [
+    allCardsOpen,
+    confirmRefresh,
+    confirmReturn,
+    deckModalOpen,
+    isHandOpen,
+    namePromptOpen,
+    selectedCard,
+  ]);
+
+  useEffect(() => {
+    return () => {
+      if (colorRecheckTimerRef.current) {
+        window.clearTimeout(colorRecheckTimerRef.current);
+      }
+    };
+  }, []);
+
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(() => null);
@@ -217,6 +364,71 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     if (!room || !playerId) return null;
     return room.players[playerId] || null;
   }, [room, playerId]);
+
+  const diceGlowColor = useMemo(() => {
+    if (!diceRoll?.playerId || !room) return null;
+    const roller = room.players[diceRoll.playerId];
+    if (!roller?.color) return null;
+    return getPlayerColorInfo(roller.color).glow;
+  }, [diceRoll?.playerId, room]);
+
+  useEffect(() => {
+    if (!room?.last_dice_roll) return;
+    setDiceRoll((current) => {
+      if (current?.rolledAt === room.last_dice_roll?.rolledAt) {
+        return current;
+      }
+      return room.last_dice_roll;
+    });
+  }, [room?.last_dice_roll]);
+
+  const handleRollDice = async () => {
+    if (!ensureReady()) return;
+    setIsDiceRolling(true);
+    pendingDiceRollRef.current = null;
+    if (diceRollTimerRef.current) {
+      window.clearTimeout(diceRollTimerRef.current);
+    }
+    diceRollTimerRef.current = window.setTimeout(() => {
+      setIsDiceRolling(false);
+      diceRollTimerRef.current = null;
+      const roll = pendingDiceRollRef.current;
+      if (!roll) return;
+      pendingDiceRollRef.current = null;
+      void roomChannelRef.current?.send({
+        type: "broadcast",
+        event: "dice_roll",
+        payload: roll,
+      });
+    }, 2000);
+
+    await withLoading(async () => {
+      const response = await rollDice(roomId, playerId);
+      const hasError = await handleResponseError(response);
+      if (!hasError) {
+        const data = (await response.json().catch(() => null)) as
+          | { roll?: DiceRollState }
+          | null;
+        if (data?.roll) {
+          const roll = data.roll;
+          setDiceRoll(roll);
+          pendingDiceRollRef.current = roll;
+          if (diceRollTimerRef.current === null) {
+            pendingDiceRollRef.current = null;
+            void roomChannelRef.current?.send({
+              type: "broadcast",
+              event: "dice_roll",
+              payload: roll,
+            });
+          }
+          setRoom((current) =>
+            current ? { ...current, last_dice_roll: roll } : current
+          );
+        }
+        fetchRoom();
+      }
+    });
+  };
 
   const handleDraw = async () => {
     if (!ensureReady()) return;
@@ -249,6 +461,23 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       }
     });
   };
+
+  const commitProfile = useCallback(() => {
+    const nextName = nameDraft.trim();
+    const nextColor = colorDraft || DEFAULT_PLAYER_COLOR;
+    if (!nextName) {
+      showToast("Informe um nome.");
+      return;
+    }
+
+    setStoredPlayerName(nextName);
+    setStoredPlayerColor(nextColor);
+    setPlayerName(nextName);
+    setNameDraft(nextName);
+    setColorDraft(nextColor);
+    setNamePromptOpen(false);
+    void joinProfile(nextName, nextColor);
+  }, [colorDraft, joinProfile, nameDraft, showToast]);
 
 
   const handleReturn = async () => {
@@ -295,6 +524,15 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     return entries;
   }, [room, playerId]);
 
+  const takenColorIds = useMemo(() => {
+    const ids = new Set<string>();
+    orderedPlayers.forEach((entry) => {
+      if (entry.id === playerId) return;
+      if (entry.color) ids.add(entry.color);
+    });
+    return ids;
+  }, [orderedPlayers, playerId]);
+
   const availableByClass = useMemo(() => {
     if (!room) return { Resiliente: [], Sinergista: [], Impetuoso: [] };
     const available = [
@@ -333,15 +571,21 @@ export default function RoomClient({ roomId }: RoomClientProps) {
 
   return (
     <div className="relative flex h-full flex-1 overflow-hidden">
-      <div className="absolute left-4 top-4 z-40">
-        <button
+      <div
+        className={`absolute left-4 top-4 z-40 transition-opacity duration-200 ${
+          isHandOpen ? "pointer-events-none opacity-0" : "opacity-100"
+        }`}
+      >
+        <motion.button
           onClick={() => setMenuOpen((open) => !open)}
-          className="flex h-10 w-10 flex-col items-center justify-center gap-1 rounded-full border border-white/20 bg-black/40"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          className="flex h-10 w-10 cursor-pointer flex-col items-center justify-center gap-1 rounded-full border border-white/20 bg-black/40"
         >
           <span className="h-0.5 w-4 bg-white" />
           <span className="h-0.5 w-4 bg-white" />
           <span className="h-0.5 w-4 bg-white" />
-        </button>
+        </motion.button>
         <AnimatePresence>
           {menuOpen && (
             <motion.div
@@ -350,7 +594,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
               exit={{ opacity: 0, y: -8 }}
               className="mt-3 w-48 rounded-2xl border border-white/10 bg-black/80 p-3 text-sm text-white"
             >
-              <p className="mb-2 text-center text-xs uppercase tracking-widest text-white/50">
+              <p className="mb-2 text-center font-mono text-sm uppercase tracking-[0.18em] text-white/50">
                 {roomId}
               </p>
               <div className="mb-2 h-px bg-white/10" />
@@ -375,6 +619,12 @@ export default function RoomClient({ roomId }: RoomClientProps) {
               >
                 Alternar Fullscreen
               </button>
+              <button
+                onClick={() => setCardRenderMode((mode) => (mode === "safe" ? "classic" : "safe"))}
+                className="mt-1 w-full rounded-lg px-3 py-2 text-left hover:bg-white/10"
+              >
+                Modo de cartas: {cardRenderMode === "safe" ? "Seguro" : "Clássico"}
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
@@ -383,8 +633,15 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       <div className="grid h-full w-full grid-cols-2">
         <section className="relative flex h-full flex-col items-center justify-center border-r border-white/10">
           <div className="relative flex h-full w-full items-center justify-center">
-            <div className="relative z-10">
-              <Dice size={gs.diceSize} />
+              <div className="relative z-10">
+                <Dice
+                  size={Math.round(gs.diceSize * 1.25 * 0.95)}
+                  value={diceRoll?.value ?? null}
+                  isRolling={isDiceRolling}
+                  shakeToken={diceRoll?.rolledAt ?? null}
+                  glowColor={diceGlowColor}
+                  onRoll={handleRollDice}
+                />
             </div>
 
             <div className="absolute inset-0">
@@ -395,6 +652,13 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                 handCardsLength={handCards.length}
                 viewport={viewport}
                 gameScale={gs}
+                renderMode={cardRenderMode}
+                onEditProfile={() => {
+                  const currentColor = player?.color || getStoredPlayerColor() || DEFAULT_PLAYER_COLOR;
+                  setNameDraft(playerName || getStoredPlayerName());
+                  setColorDraft(currentColor);
+                  setNamePromptOpen(true);
+                }}
                 onOpenHand={() => {
                   if (handCards.length === 0) return;
                   setIsHandOpen((open) => !open);
@@ -415,22 +679,28 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                   <h2 className="font-display text-3xl uppercase tracking-wide text-white">
                     Sua Mão
                   </h2>
-                  <button
+                  <motion.button
                     onClick={() => setIsHandOpen(false)}
-                    className="rounded-full border border-white/20 px-4 py-2 text-xs uppercase tracking-wide"
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.96 }}
+                    className="cursor-pointer rounded-full border border-white/20 px-4 py-2 text-xs uppercase tracking-wide"
                   >
                     Fechar
-                  </button>
+                  </motion.button>
                 </div>
-                <div className="mt-6 flex flex-1 flex-col gap-4 overflow-y-auto pr-2">
+                <div className="scrollbar-accent mt-6 flex flex-1 flex-col gap-4 overflow-y-auto pr-2">
                   {handCards.map((card) => (
                     <div
                       key={card.id}
                       className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-3"
                     >
-                      <div className="flex-shrink-0" onClick={() => setSelectedCard(card)}>
-                        <ScaledCard card={card} scale={gs.scale} />
-                      </div>
+                      <ScaledCard
+                        card={card}
+                        scale={gs.scale}
+                        renderMode={cardRenderMode}
+                        onClick={() => setSelectedCard(card)}
+                        className="flex-shrink-0"
+                      />
                       <div className="flex flex-1 flex-col gap-2">
                         <p className="font-display text-2xl uppercase tracking-wide text-white">
                           {card.titulo}
@@ -438,22 +708,26 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                         <p className="text-sm text-white/70">{card.descricao}</p>
                       </div>
                       <div className="flex flex-col gap-2">
-                        <button
+                        <motion.button
                           onClick={() =>
                             setConfirmReturn({ cardId: card.id, label: "Usar" })
                           }
-                          className="rounded-full bg-[color:var(--accent)] px-4 py-2 text-xs font-semibold uppercase tracking-wide text-black"
+                          whileHover={{ scale: 1.03 }}
+                          whileTap={{ scale: 0.96 }}
+                          className="cursor-pointer rounded-full bg-[color:var(--accent)] px-4 py-2 text-xs font-semibold uppercase tracking-wide text-black"
                         >
                           Usar
-                        </button>
-                        <button
+                        </motion.button>
+                        <motion.button
                           onClick={() =>
                             setConfirmReturn({ cardId: card.id, label: "Descartar" })
                           }
-                          className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white"
+                          whileHover={{ scale: 1.03 }}
+                          whileTap={{ scale: 0.96 }}
+                          className="cursor-pointer rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white"
                         >
                           Descartar
-                        </button>
+                        </motion.button>
                       </div>
                     </div>
                   ))}
@@ -463,11 +737,19 @@ export default function RoomClient({ roomId }: RoomClientProps) {
           </AnimatePresence>
         </section>
 
-        <section className="relative flex h-full flex-col items-center justify-center gap-4 p-4">
+        <section
+          className="relative flex h-full flex-col items-center justify-center gap-4 p-4"
+          onClick={(event) => {
+            if (event.target === event.currentTarget && isHandOpen) {
+              setIsHandOpen(false);
+            }
+          }}
+        >
           <div className="flex flex-col items-center gap-2">
             <DeckPile
               w={gs.deckW}
               h={gs.deckH}
+              renderMode={cardRenderMode}
               onClick={() => {
                 setDeckRevealCard(null);
                 setDeckModalOpen(true);
@@ -488,6 +770,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                 card={card}
                 isFaceUp={Boolean(card)}
                 scale={gs.scale}
+                renderMode={cardRenderMode}
                 onClick={() => {
                   if (!card) return;
                   setSelectedMarketIndex(index);
@@ -497,12 +780,14 @@ export default function RoomClient({ roomId }: RoomClientProps) {
             ))}
           </div>
 
-          <button
+          <motion.button
             onClick={() => setConfirmRefresh(true)}
-            className="rounded-full border border-white/20 px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-white"
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.96 }}
+            className="cursor-pointer rounded-full border border-white/20 px-6 py-3 text-base font-semibold uppercase tracking-[0.18em] text-white"
           >
             Repor Mercado
-          </button>
+          </motion.button>
         </section>
       </div>
 
@@ -510,6 +795,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
         card={selectedCard}
         isOpen={Boolean(selectedCard)}
         actionLabel={selectedMarketIndex !== null ? "Comprar" : undefined}
+        renderMode={cardRenderMode}
         onClose={() => {
           setSelectedCard(null);
           setSelectedMarketIndex(null);
@@ -523,6 +809,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
         actionLabel={deckRevealCard ? undefined : "Comprar do Monte"}
         showBackOnly={!deckRevealCard}
         disableFlip={!deckRevealCard}
+        renderMode={cardRenderMode}
         onClose={() => {
           setDeckModalOpen(false);
           setDeckRevealCard(null);
@@ -598,7 +885,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                               setSelectedCard(card);
                             }}
                           >
-                            <ScaledCard card={card} scale={0.67} />
+                            <ScaledCard card={card} scale={0.67} renderMode={cardRenderMode} />
                             <div className="flex flex-col gap-2">
                               <p className="text-xs uppercase tracking-widest text-white/70">
                                 {count} cópias
@@ -623,39 +910,74 @@ export default function RoomClient({ roomId }: RoomClientProps) {
         {namePromptOpen && (
           <motion.div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur"
+            onClick={() => setNamePromptOpen(false)}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
             <motion.div
+              onClick={(event) => event.stopPropagation()}
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 12 }}
-              className="w-[min(90vw,420px)] rounded-3xl border border-white/10 bg-black/80 p-6 text-white"
+              className="w-[min(92vw,560px)] rounded-3xl border border-white/10 bg-black/85 p-6 text-white"
             >
               <h2 className="font-display text-3xl uppercase tracking-wide">
-                Seu nome
+                {playerName ? "Editar perfil" : "Seu nome"}
               </h2>
               <p className="mt-2 text-sm text-white/70">
-                Esse nome aparece acima da sua mão.
+                Escolha um nome e uma cor fixa para esta sala.
               </p>
               <input
                 value={nameDraft}
                 onChange={(event) => setNameDraft(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter") commitPlayerName();
+                  if (event.key === "Enter") commitProfile();
                 }}
                 placeholder="Digite seu nome"
                 maxLength={24}
                 autoFocus
                 className="mt-4 w-full rounded-full border border-white/20 bg-black/30 px-4 py-3 text-sm uppercase tracking-widest text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[color:var(--accent)]"
               />
-              <button
-                onClick={commitPlayerName}
-                className="mt-4 w-full rounded-full bg-[color:var(--accent)] px-5 py-3 text-sm font-semibold uppercase tracking-wide text-black"
+              <div className="mt-5">
+                <p className="mb-3 text-xs uppercase tracking-[0.22em] text-white/55">
+                  Cor do jogador
+                </p>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {PLAYER_COLORS.map((entry) => {
+                    const isActive = colorDraft === entry.id;
+                    const isTakenByOther = takenColorIds.has(entry.id) && !isActive;
+                    return (
+                      <button
+                        key={entry.id}
+                        type="button"
+                        disabled={isTakenByOther}
+                        onClick={() => setColorDraft(entry.id)}
+                        className={`flex items-center gap-2 rounded-2xl border px-3 py-3 text-left text-xs uppercase tracking-[0.14em] transition ${
+                          isActive ? "border-white/35 bg-white/10" : "border-white/10 bg-white/5"
+                        } ${isTakenByOther ? "cursor-not-allowed opacity-35" : "hover:bg-white/10"}`}
+                        style={{
+                          boxShadow: isActive ? `0 0 0 1px ${entry.glow}, 0 0 18px ${entry.glow}` : undefined,
+                        }}
+                      >
+                        <span
+                          className="h-5 w-5 rounded-md border border-black/20"
+                          style={{ backgroundColor: entry.value }}
+                        />
+                        <span className="truncate">{entry.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <motion.button
+                onClick={commitProfile}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.96 }}
+                className="mt-5 w-full cursor-pointer rounded-full bg-[color:var(--accent)] px-5 py-3 text-sm font-semibold uppercase tracking-wide text-black"
               >
-                Entrar na sala
-              </button>
+                {playerName ? "Salvar alterações" : "Entrar na sala"}
+              </motion.button>
             </motion.div>
           </motion.div>
         )}

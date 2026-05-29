@@ -16,6 +16,24 @@ export const drawFromDeck = async (roomId: string, playerId: string) =>
     body: JSON.stringify({ roomId, playerId }),
   });
 
+export const rollDice = async (roomId: string, playerId: string) =>
+  fetch("/api/rooms/roll", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ roomId, playerId }),
+  });
+
+export const setPlayerColor = async (
+  roomId: string,
+  playerId: string,
+  color: string
+) =>
+  fetch("/api/rooms/color", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ roomId, playerId, color }),
+  });
+
 export const buyFromMarket = async (
   roomId: string,
   playerId: string,

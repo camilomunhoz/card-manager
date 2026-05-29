@@ -1,8 +1,15 @@
 "use client";
 
+import { motion } from "framer-motion";
 import type { PlayerState } from "@/lib/types";
 import type { GameScale } from "@/hooks/useGameScale";
 import ScaledCard from "./ScaledCard";
+import type { CardRenderMode } from "./GameCard";
+import {
+  DEFAULT_PLAYER_COLOR,
+  getPlayerColorInfo,
+  getReadableTextColor,
+} from "@/lib/playerColors";
 
 interface PlayerSeatProps {
   player: PlayerState;
@@ -11,48 +18,106 @@ interface PlayerSeatProps {
   seatScale: number;
   cardScale: number;
   onClickHand?: () => void;
+  onEditProfile?: () => void;
+  renderMode: CardRenderMode;
 }
 
-function PlayerSeat({ player, displayName, isSelf, seatScale, cardScale, onClickHand }: PlayerSeatProps) {
+function PlayerSeat({
+  player,
+  displayName,
+  isSelf,
+  seatScale,
+  cardScale,
+  onClickHand,
+  onEditProfile,
+  renderMode,
+}: PlayerSeatProps) {
   const cards = player.hand ?? [];
   const visible = cards.slice(0, 8);
-  const selfScale = isSelf ? 1.5 : 1;
+  const selfScale = isSelf ? 1.36 : 1;
+  const colorInfo = getPlayerColorInfo(player.color || DEFAULT_PLAYER_COLOR);
+  const fanCenterShift = 34 * cardScale;
 
   return (
-    <div
+    <motion.div
       className={`flex flex-col items-center ${isSelf ? "cursor-pointer" : "pointer-events-none"}`}
-      style={{ transform: `scale(${seatScale * selfScale})`, transformOrigin: "center" }}
+      style={{ scale: seatScale * selfScale, transformOrigin: "center" }}
       onClick={onClickHand}
     >
-      <span className="mb-[-16] whitespace-nowrap text-[10px] uppercase tracking-[0.2em] text-white/70">
-        {displayName}
-      </span>
+      <div className="relative z-20 mb-1 whitespace-nowrap">
+        {isSelf ? (
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              onEditProfile?.();
+            }}
+            className="inline-flex items-center gap-2 rounded-full px-1 py-0.5 text-[10px] uppercase tracking-[0.2em] text-white/75 transition hover:text-white"
+          >
+            <span>{displayName}</span>
+            <span
+              className="inline-flex h-5 min-w-6 items-center justify-center rounded-full border border-white/15 px-2 text-[10px] font-black uppercase leading-none tabular-nums tracking-[0.18em]"
+              style={{
+                backgroundColor: colorInfo.value,
+                color: getReadableTextColor(colorInfo.value),
+                boxShadow: `0 0 0 1px rgba(255,255,255,0.08)`,
+              }}
+            >
+              {cards.length}
+            </span>
+          </button>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] uppercase tracking-[0.2em] text-white/70">
+              {displayName}
+            </span>
+            <span
+              className="inline-flex h-5 min-w-6 items-center justify-center rounded-full border border-white/15 px-2 text-[10px] font-black uppercase leading-none tabular-nums tracking-[0.18em]"
+              style={{
+                backgroundColor: colorInfo.value,
+                color: getReadableTextColor(colorInfo.value),
+                boxShadow: `0 0 0 1px rgba(255,255,255,0.08)`,
+              }}
+            >
+              {cards.length}
+            </span>
+          </div>
+        )}
+      </div>
 
-      <div className="relative" style={{ width: 240 * cardScale, height: 144 * cardScale + 32 }}>
+      <div
+        className="relative z-0 pointer-events-none"
+        style={{ width: 240 * cardScale, height: 144 * cardScale + 24 }}
+      >
         {visible.length === 0 ? (
           <span className="text-[10px] uppercase tracking-widest text-white/30">
             Sem cartas
           </span>
         ) : (
           visible.map((card, i) => {
-            const fanAngle = i * 6 - visible.length * 2.5;
-            const fanOffset = i * 10;
+            const fanAngle = i * 5 - visible.length * 2;
+            const fanOffset = i * 8 - (visible.length - 1) * 4;
             return (
               <div
                 key={`${player.id}-${card.id}-${i}`}
                 className="absolute bottom-0 left-1/2"
                 style={{
-                  transform: `translateX(${fanOffset}px) rotate(-90deg) rotate(${fanAngle}deg)`,
+                  transform: `translateX(calc(${fanOffset}px - 50% + ${fanCenterShift}px)) rotate(-90deg) rotate(${fanAngle}deg)`,
                   transformOrigin: "bottom center",
                 }}
               >
-                <ScaledCard card={card} isFaceUp={false} scale={cardScale} />
+                <ScaledCard
+                  card={card}
+                  isFaceUp={false}
+                  scale={cardScale}
+                  renderMode={renderMode}
+                />
               </div>
             );
           })
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -73,12 +138,12 @@ function computeSeats(count: number): SeatSlot[] {
   const m = margin * 100;
   const mc = 100 - m;
   return [
-    { angle: SEAT_ANGLES[0], left: "50%", top: `${mc-10}%` },
-    { angle: SEAT_ANGLES[1], left: `${m}%`,  top: "80%" },
+    { angle: SEAT_ANGLES[0], left: "50%", top: `${mc - 10}%` },
+    { angle: SEAT_ANGLES[1], left: `${m}%`, top: "80%" },
     { angle: SEAT_ANGLES[2], left: `${m}%`, top: "50%" },
-    { angle: SEAT_ANGLES[3], left: `${m}%`,  top: "20%" },
-    { angle: SEAT_ANGLES[4], left: `50%`, top: `${m}%` },
-    { angle: SEAT_ANGLES[5], left: `${mc-15}%`, top: `${m}%` },
+    { angle: SEAT_ANGLES[3], left: `${m}%`, top: "20%" },
+    { angle: SEAT_ANGLES[4], left: "50%", top: `${m}%` },
+    { angle: SEAT_ANGLES[5], left: `${mc - 15}%`, top: `${m}%` },
   ];
 }
 
@@ -99,6 +164,8 @@ interface PlayerSeatsLayoutProps {
   viewport: { width: number; height: number };
   gameScale: GameScale;
   onOpenHand: () => void;
+  onEditProfile: () => void;
+  renderMode?: CardRenderMode;
 }
 
 export default function PlayerSeatsLayout({
@@ -109,6 +176,8 @@ export default function PlayerSeatsLayout({
   viewport,
   gameScale,
   onOpenHand,
+  onEditProfile,
+  renderMode = "safe",
 }: PlayerSeatsLayoutProps) {
   const seats = computeSeats(orderedPlayers.length);
   const seatScale = computeScale(viewport.width / 2, viewport.height, gameScale);
@@ -123,7 +192,7 @@ export default function PlayerSeatsLayout({
         if (!slot) return null;
         const isSelf = seatPlayer.id === playerId;
         const displayName = seatPlayer.name || (isSelf ? playerName : "Jogador");
-        const label = isSelf ? `${displayName} (voce)` : displayName;
+        const label = isSelf ? `${displayName} (você)` : displayName;
 
         return (
           <div
@@ -145,6 +214,8 @@ export default function PlayerSeatsLayout({
               isSelf={isSelf}
               seatScale={seatScale}
               cardScale={fanCardScale}
+              onEditProfile={isSelf ? onEditProfile : undefined}
+              renderMode={renderMode}
             />
           </div>
         );

@@ -31,6 +31,7 @@ export async function POST() {
       deck_queue: remaining,
       market_cards: market,
       players: {},
+      last_dice_roll: null,
     });
     if (!error) break;
     roomId = generateRoomCode();

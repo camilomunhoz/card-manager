@@ -4,8 +4,12 @@ create table if not exists public.rooms (
   deck_queue jsonb not null default '[]'::jsonb,
   market_cards jsonb not null default '[]'::jsonb,
   players jsonb not null default '{}'::jsonb,
+  last_dice_roll jsonb,
   created_at timestamptz not null default now()
 );
+
+alter table public.rooms
+  add column if not exists last_dice_roll jsonb;
 
 alter table public.rooms enable row level security;
 
