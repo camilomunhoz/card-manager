@@ -48,12 +48,13 @@ export const buyFromMarket = async (
 export const returnCard = async (
   roomId: string,
   playerId: string,
-  cardId: string
+  cardId: string,
+  action: "used" | "discarded"
 ) =>
   fetch("/api/rooms/return", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ roomId, playerId, cardId }),
+    body: JSON.stringify({ roomId, playerId, cardId, action }),
   });
 
 export const refreshMarket = async (roomId: string, playerId: string) =>

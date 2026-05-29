@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import type { RealtimeChannel } from "@supabase/supabase-js";
-import type { CardData, PlayerState, RoomState } from "@/lib/types";
+import type { CardData, CardHistoryEntry, PlayerState, RoomState } from "@/lib/types";
 import type { CardRenderMode } from "@/components/GameCard";
 import { supabaseBrowser } from "@/lib/supabaseBrowser";
 import {
@@ -35,8 +35,10 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import Toast from "@/components/Toast";
 import PlayerSeatsLayout from "@/components/PlayerSeatsLayout";
 import LoadingSpinner from "@/components/LoadingSpinner";
+import HistoryButton from "@/components/HistoryButton";
+import HistoryModal from "@/components/HistoryModal";
 import { useGameScale } from "@/hooks/useGameScale";
-import type { DiceRollState } from "@/lib/types";
+import type { DiceRollState, CardHistoryAction } from "@/lib/types";
 import {
   DEFAULT_PLAYER_COLOR,
   getPlayerColorInfo,
@@ -50,6 +52,8 @@ interface RoomClientProps {
 export default function RoomClient({ roomId }: RoomClientProps) {
   const router = useRouter();
   const [room, setRoom] = useState<RoomState | null>(null);
+  const [historyEntries, setHistoryEntries] = useState<CardHistoryEntry[]>([]);
+  const [historyPulseToken, setHistoryPulseToken] = useState(0);
   const [playerId, setPlayerId] = useState<string>("");
   const [playerName, setPlayerName] = useState<string>("");
   const [nameDraft, setNameDraft] = useState<string>("");
@@ -68,6 +72,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const [confirmReturn, setConfirmReturn] = useState<{
     cardId: string;
     label: string;
+    action: CardHistoryAction;
   } | null>(null);
   const [confirmKick, setConfirmKick] = useState<{
     playerId: string;
@@ -77,6 +82,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const [deckModalOpen, setDeckModalOpen] = useState(false);
   const [deckRevealCard, setDeckRevealCard] = useState<CardData | null>(null);
   const [allCardsOpen, setAllCardsOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const toastTimer = useRef<number | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
@@ -172,7 +178,19 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       .select("*")
       .eq("id", roomId)
       .single();
-    if (data) setRoom(data as RoomState);
+    if (data) {
+      const nextRoom = data as RoomState;
+      setRoom(nextRoom);
+      if (Array.isArray(nextRoom.card_history)) {
+        setHistoryEntries((current) => {
+          const merged = new Map<string, CardHistoryEntry>();
+          [...current, ...nextRoom.card_history!].forEach((entry) => {
+            merged.set(entry.id, entry);
+          });
+          return Array.from(merged.values()).sort((left, right) => left.createdAt - right.createdAt);
+        });
+      }
+    }
   }, [roomId]);
 
   const joinProfile = useCallback(
@@ -246,6 +264,21 @@ export default function RoomClient({ roomId }: RoomClientProps) {
           if (roll) {
             setDiceRoll(roll);
           }
+        }
+      )
+      .on(
+        "broadcast",
+        { event: "card_history" },
+        ({ payload }) => {
+          const entry = payload as CardHistoryEntry | null;
+          if (!entry) return;
+          setHistoryEntries((current) => {
+            if (current.some((item) => item.id === entry.id)) {
+              return current;
+            }
+            return [...current, entry].sort((left, right) => left.createdAt - right.createdAt);
+          });
+          setHistoryPulseToken((current) => current + 1);
         }
       )
       .on(
@@ -332,6 +365,11 @@ export default function RoomClient({ roomId }: RoomClientProps) {
         return;
       }
 
+      if (historyOpen) {
+        setHistoryOpen(false);
+        return;
+      }
+
       if (confirmKick) {
         setConfirmKick(null);
         return;
@@ -354,6 +392,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     confirmRefresh,
     confirmReturn,
     confirmKick,
+    historyOpen,
     deckModalOpen,
     isHandOpen,
     namePromptOpen,
@@ -496,10 +535,39 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const handleReturn = async () => {
     if (!playerId || !confirmReturn) return;
     await withLoading(async () => {
-      const response = await returnCard(roomId, playerId, confirmReturn.cardId);
+      const player = room?.players[playerId];
+      const card = player?.hand.find((entry) => entry.id === confirmReturn.cardId);
+      const response = await returnCard(roomId, playerId, confirmReturn.cardId, confirmReturn.action);
       const hasError = await handleResponseError(response);
       if (!hasError) {
+        const data = (await response.json().catch(() => null)) as
+          | { historyEntry?: CardHistoryEntry }
+          | null;
         setConfirmReturn(null);
+        const nextEntry = data?.historyEntry ?? (card && player ? {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
+          action: confirmReturn.action,
+          card,
+          playerId: player.id,
+          playerName: player.name,
+          playerColor: player.color || DEFAULT_PLAYER_COLOR,
+          createdAt: Date.now(),
+        } : null);
+
+        if (nextEntry) {
+          setHistoryEntries((current) => {
+            if (current.some((entry) => entry.id === nextEntry.id)) {
+              return current;
+            }
+            return [...current, nextEntry].sort((left, right) => left.createdAt - right.createdAt);
+          });
+          setHistoryPulseToken((current) => current + 1);
+          void roomChannelRef.current?.send({
+            type: "broadcast",
+            event: "card_history",
+            payload: nextEntry,
+          });
+        }
         fetchRoom();
       }
     });
@@ -555,6 +623,11 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     () => handCards.find((card) => card.id === selectedHandCardId) || handCards[0] || null,
     [handCards, selectedHandCardId]
   );
+  const visibleHistoryEntries = historyEntries.length ? historyEntries : (room?.card_history ?? []);
+  const latestHistoryEntry = visibleHistoryEntries[visibleHistoryEntries.length - 1] ?? null;
+  const latestHistoryGlow = latestHistoryEntry
+    ? getPlayerColorInfo(latestHistoryEntry.playerColor).value
+    : null;
 
   const orderedPlayers = useMemo(() => {
     if (!room) return [] as PlayerState[];
@@ -656,8 +729,13 @@ export default function RoomClient({ roomId }: RoomClientProps) {
               exit={{ opacity: 0, y: -8 }}
               className="mt-3 w-48 rounded-2xl border border-white/10 bg-black/80 p-3 text-sm text-white"
             >
-              <p className="mb-2 text-center font-mono text-sm uppercase tracking-[0.18em] text-white/50">
+              <p className="mb-1 text-center font-mono text-sm uppercase tracking-[0.18em] text-white/50">
                 {roomId}
+              </p>
+              <p className="mb-2 text-center text-[10px] uppercase tracking-[0.22em] text-white/45">
+                {latestHistoryEntry
+                  ? `${latestHistoryEntry.playerName} ${latestHistoryEntry.action === "used" ? "usou" : "descartou"} uma carta`
+                  : "Nenhuma carta no histórico ainda"}
               </p>
               <div className="mb-2 h-px bg-white/10" />
               <button
@@ -676,6 +754,15 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                 className="mt-1 w-full rounded-lg px-3 py-2 text-left hover:bg-white/10"
               >
                 Ver todas as cartas
+              </button>
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  setHistoryOpen(true);
+                }}
+                className="mt-1 w-full rounded-lg px-3 py-2 text-left hover:bg-white/10"
+              >
+                Ver histórico
               </button>
               <button
                 onClick={toggleFullscreen}
@@ -801,7 +888,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                             onClick={(event) => {
                               event.stopPropagation();
                               setSelectedHandCardId(card.id);
-                              setConfirmReturn({ cardId: card.id, label: "Usar" });
+                              setConfirmReturn({ cardId: card.id, label: "Usar", action: "used" });
                             }}
                             whileHover={{ scale: 1.03 }}
                             whileTap={{ scale: 0.96 }}
@@ -813,7 +900,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                             onClick={(event) => {
                               event.stopPropagation();
                               setSelectedHandCardId(card.id);
-                              setConfirmReturn({ cardId: card.id, label: "Descartar" });
+                              setConfirmReturn({ cardId: card.id, label: "Descartar", action: "discarded" });
                             }}
                             whileHover={{ scale: 1.03 }}
                             whileTap={{ scale: 0.96 }}
@@ -830,7 +917,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                     <div className="fixed bottom-4 left-4 right-4 z-60 mx-auto w-[calc(100%-2rem)] max-w-lg rounded-2xl bg-black/80 p-3 backdrop-blur">
                       <div className="flex gap-3">
                         <motion.button
-                          onClick={() => setConfirmReturn({ cardId: compactActiveCard.id, label: "Usar" })}
+                          onClick={() => setConfirmReturn({ cardId: compactActiveCard.id, label: "Usar", action: "used" })}
                           whileHover={{ scale: 1.03 }}
                           whileTap={{ scale: 0.96 }}
                           className="flex-1 rounded-full bg-[color:var(--accent)] px-4 py-3 text-sm font-semibold uppercase tracking-wide text-black"
@@ -838,7 +925,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                           Usar
                         </motion.button>
                         <motion.button
-                          onClick={() => setConfirmReturn({ cardId: compactActiveCard.id, label: "Descartar" })}
+                          onClick={() => setConfirmReturn({ cardId: compactActiveCard.id, label: "Descartar", action: "discarded" })}
                           whileHover={{ scale: 1.03 }}
                           whileTap={{ scale: 0.96 }}
                           className="flex-1 rounded-full border border-white/20 px-4 py-3 text-sm font-semibold uppercase tracking-wide text-white"
@@ -904,6 +991,13 @@ export default function RoomClient({ roomId }: RoomClientProps) {
           >
             Repor Mercado
           </motion.button>
+          <HistoryButton
+            onClick={() => setHistoryOpen(true)}
+            className="mt-2"
+            action={latestHistoryEntry?.action ?? null}
+            glowColor={latestHistoryGlow}
+            pulseToken={historyPulseToken || latestHistoryEntry?.id || visibleHistoryEntries.length}
+          />
         </section>
       </div>
 
@@ -946,6 +1040,12 @@ export default function RoomClient({ roomId }: RoomClientProps) {
         confirmLabel={confirmReturn?.label || "Confirmar"}
         onCancel={() => setConfirmReturn(null)}
         onConfirm={handleReturn}
+      />
+
+      <HistoryModal
+        entries={visibleHistoryEntries}
+        isOpen={historyOpen}
+        onClose={() => setHistoryOpen(false)}
       />
 
       <ConfirmDialog

@@ -11,6 +11,18 @@ export interface CardData {
   condicao: string | null;
 }
 
+export type CardHistoryAction = "used" | "discarded";
+
+export interface CardHistoryEntry {
+  id: string;
+  action: CardHistoryAction;
+  card: CardData;
+  playerId: string;
+  playerName: string;
+  playerColor: PlayerColor;
+  createdAt: number;
+}
+
 export interface PlayerState {
   id: string;
   name: string;
@@ -32,4 +44,5 @@ export interface RoomState {
   market_cards: Array<CardData | null>;
   players: Record<string, PlayerState>;
   last_dice_roll: DiceRollState | null;
+  card_history?: CardHistoryEntry[];
 }
