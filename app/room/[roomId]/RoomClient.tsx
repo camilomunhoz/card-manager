@@ -55,8 +55,9 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const [portrait, setPortrait] = useState(false);
   const [viewport, setViewport] = useState({ width: 0, height: 0 });
   const [menuOpen, setMenuOpen] = useState(false);
-  const [cardRenderMode, setCardRenderMode] = useState<CardRenderMode>("safe");
+  const [cardRenderMode, setCardRenderMode] = useState<CardRenderMode>("classic");
   const [selectedCard, setSelectedCard] = useState<CardData | null>(null);
+  const [selectedHandCardId, setSelectedHandCardId] = useState<string | null>(null);
   const [selectedMarketIndex, setSelectedMarketIndex] = useState<number | null>(
     null
   );
@@ -503,6 +504,8 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const handCards = player?.hand ?? [];
 
   const gs = useGameScale(viewport);
+  const isCompact = Boolean(viewport.width && (viewport.width < 640 || viewport.height < 520));
+  const compactActiveCard = selectedCard ?? (handCards.length > 0 ? handCards[0] : null);
 
   const orderedPlayers = useMemo(() => {
     if (!room) return [] as PlayerState[];
@@ -666,71 +669,115 @@ export default function RoomClient({ roomId }: RoomClientProps) {
 
           <AnimatePresence>
             {isHandOpen && (
-              <motion.div
-                initial={{ opacity: 0, y: 40 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 40 }}
-                className="absolute inset-0 z-30 flex flex-col bg-black/70 p-6"
-              >
-                <div className="flex items-center justify-between">
-                  <h2 className="font-display text-3xl uppercase tracking-wide text-white">
-                    Sua Mão
-                  </h2>
-                  <motion.button
-                    onClick={() => setIsHandOpen(false)}
-                    whileHover={{ scale: 1.03 }}
-                    whileTap={{ scale: 0.96 }}
-                    className="cursor-pointer rounded-full border border-white/20 px-4 py-2 text-xs uppercase tracking-wide"
-                  >
-                    Fechar
-                  </motion.button>
-                </div>
-                <div className="scrollbar-accent mt-6 flex flex-1 flex-col gap-4 overflow-y-auto pr-2">
-                  {handCards.map((card) => (
-                    <div
-                      key={card.id}
-                      className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-3"
+                <motion.div
+                  initial={{ opacity: 0, y: 40 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 40 }}
+                  className={`fixed inset-0 z-50 flex flex-col bg-black/90 p-4 ${isCompact ? "pt-6 pb-20" : "p-6"}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <h2 className="font-display text-3xl uppercase tracking-wide text-white">
+                      Sua Mão
+                    </h2>
+                    <motion.button
+                      onClick={() => setIsHandOpen(false)}
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.96 }}
+                      className="cursor-pointer rounded-full border border-white/20 px-4 py-2 text-xs uppercase tracking-wide"
                     >
-                      <ScaledCard
-                        card={card}
-                        scale={gs.scale}
-                        renderMode={cardRenderMode}
-                        onClick={() => setSelectedCard(card)}
-                        className="flex-shrink-0"
-                      />
-                      <div className="flex flex-1 flex-col gap-2">
-                        <p className="font-display text-2xl uppercase tracking-wide text-white">
-                          {card.titulo}
-                        </p>
-                        <p className="text-sm text-white/70">{card.descricao}</p>
+                      Fechar
+                    </motion.button>
+                  </div>
+
+                  <div className="scrollbar-accent mt-4 flex flex-1 flex-col gap-4 overflow-y-auto pr-2">
+                    {handCards.map((card) => (
+                      <div
+                        key={card.id}
+                        onClick={() => setSelectedHandCardId(card.id)}
+                        className={`flex w-full flex-col items-stretch gap-3 rounded-2xl border p-3 transition sm:flex-row sm:items-center ${
+                          selectedHandCardId === card.id
+                            ? "border-[color:var(--accent)] bg-[color:var(--accent)]/10 shadow-[0_0_0_1px_rgba(255,255,255,0.06),0_0_24px_rgba(255,140,60,0.22)]"
+                            : "border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10"
+                        }`}
+                      >
+                        <div className="flex-shrink-0 w-full sm:w-auto flex justify-center">
+                          <ScaledCard
+                            card={card}
+                            scale={isCompact ? Math.min(0.78, gs.scale) : Math.max(0.75, gs.scale)}
+                            renderMode={cardRenderMode}
+                            onClick={() => {
+                              setSelectedHandCardId(card.id);
+                              setSelectedCard(card);
+                            }}
+                            className="mx-auto"
+                          />
+                        </div>
+                        <div className="flex flex-1 flex-col gap-2 px-1">
+                          <div className="flex items-start justify-between gap-3">
+                            <p className="font-display text-lg uppercase tracking-wide text-white">
+                              {card.titulo}
+                            </p>
+                            {selectedHandCardId === card.id && (
+                              <span className="rounded-full border border-[color:var(--accent)]/40 bg-[color:var(--accent)]/15 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--accent)]">
+                                Selecionada
+                              </span>
+                            )}
+                          </div>
+                          <p className={`text-sm text-white/70 ${isCompact ? "max-h-[36vh] overflow-y-auto" : "line-clamp-6"}`}>{card.descricao}</p>
+                        </div>
+                        <div className={`${isCompact ? "hidden" : "mt-2 flex w-full gap-2 sm:mt-0 sm:w-auto sm:flex-col"}`}>
+                          <motion.button
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setConfirmReturn({ cardId: card.id, label: "Usar" });
+                            }}
+                            whileHover={{ scale: 1.03 }}
+                            whileTap={{ scale: 0.96 }}
+                            className="w-full rounded-full bg-[color:var(--accent)] px-4 py-2 text-xs font-semibold uppercase tracking-wide text-black sm:w-auto"
+                          >
+                            Usar
+                          </motion.button>
+                          <motion.button
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setConfirmReturn({ cardId: card.id, label: "Descartar" });
+                            }}
+                            whileHover={{ scale: 1.03 }}
+                            whileTap={{ scale: 0.96 }}
+                            className="w-full rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white sm:w-auto"
+                          >
+                            Descartar
+                          </motion.button>
+                        </div>
                       </div>
-                      <div className="flex flex-col gap-2">
+                    ))}
+                  </div>
+
+                  {isCompact && compactActiveCard && (
+                    <div className="fixed bottom-4 left-4 right-4 z-60 mx-auto w-[calc(100%-2rem)] max-w-lg rounded-2xl bg-black/80 p-3 backdrop-blur">
+                      <div className="mb-2 text-sm text-white/70">{compactActiveCard.titulo}</div>
+                      <div className="flex gap-3">
                         <motion.button
-                          onClick={() =>
-                            setConfirmReturn({ cardId: card.id, label: "Usar" })
-                          }
+                          onClick={() => setConfirmReturn({ cardId: compactActiveCard.id, label: "Usar" })}
                           whileHover={{ scale: 1.03 }}
                           whileTap={{ scale: 0.96 }}
-                          className="cursor-pointer rounded-full bg-[color:var(--accent)] px-4 py-2 text-xs font-semibold uppercase tracking-wide text-black"
+                          className="flex-1 rounded-full bg-[color:var(--accent)] px-4 py-3 text-sm font-semibold uppercase tracking-wide text-black"
                         >
                           Usar
                         </motion.button>
                         <motion.button
-                          onClick={() =>
-                            setConfirmReturn({ cardId: card.id, label: "Descartar" })
-                          }
+                          onClick={() => setConfirmReturn({ cardId: compactActiveCard.id, label: "Descartar" })}
                           whileHover={{ scale: 1.03 }}
                           whileTap={{ scale: 0.96 }}
-                          className="cursor-pointer rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white"
+                          className="flex-1 rounded-full border border-white/20 px-4 py-3 text-sm font-semibold uppercase tracking-wide text-white"
                         >
                           Descartar
                         </motion.button>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </motion.div>
-            )}
+                  )}
+                </motion.div>
+              )}
           </AnimatePresence>
         </section>
 
