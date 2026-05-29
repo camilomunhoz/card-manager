@@ -436,12 +436,9 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       const response = await drawFromDeck(roomId, playerId);
       const hasError = await handleResponseError(response);
       if (!hasError) {
-        const data = (await response.json().catch(() => null)) as
-          | { card?: CardData }
-          | null;
-        if (data?.card) {
-          setDeckRevealCard(data.card);
-        }
+        await response.json().catch(() => null);
+        setDeckModalOpen(false);
+        setDeckRevealCard(null);
         showToast("Carta comprada do monte.");
         fetchRoom();
       }

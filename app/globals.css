@@ -49,34 +49,3 @@ button:active {
 .contain-strict {
   contain: style layout paint;
 }
-
-.scrollbar-accent {
-  scrollbar-color: rgba(255, 122, 89, 1) rgba(7, 10, 18, 0.95);
-  scrollbar-width: thin;
-  scrollbar-gutter: stable;
-}
-
-.scrollbar-accent::-webkit-scrollbar {
-  width: 14px;
-}
-
-.scrollbar-accent::-webkit-scrollbar-track {
-  background: rgba(7, 10, 18, 0.95);
-  border-radius: 999px;
-}
-
-.scrollbar-accent::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(255, 177, 143, 1), rgba(255, 122, 89, 1) 50%, rgba(255, 98, 53, 1));
-  border: 3px solid rgba(7, 10, 18, 0.95);
-  border-radius: 999px;
-  box-shadow: 0 0 14px rgba(255, 122, 89, 0.45);
-  min-height: 72px;
-}
-
-.scrollbar-accent::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, rgba(255, 194, 168, 1), rgba(255, 132, 98, 1) 50%, rgba(255, 102, 60, 1));
-}
-
-.scrollbar-accent::-webkit-scrollbar-button {
-  display: none;
-}

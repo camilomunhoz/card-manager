@@ -35,10 +35,5 @@ export async function POST(request: Request) {
     rolledAt: Date.now(),
   };
 
-  await supabaseAdmin
-    .from("rooms")
-    .update({ last_dice_roll: roll })
-    .eq("id", room.id);
-
   return NextResponse.json({ ok: true, roll });
 }

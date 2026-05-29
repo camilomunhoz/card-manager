@@ -24,6 +24,7 @@ export async function POST() {
   const { market, remaining } = fillMarket(shuffled, 4);
 
   let roomId = generateRoomCode();
+  let lastError: string | null = null;
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const { error } = await supabaseAdmin.from("rooms").insert({
       id: roomId,
@@ -31,11 +32,16 @@ export async function POST() {
       deck_queue: remaining,
       market_cards: market,
       players: {},
-      last_dice_roll: null,
     });
-    if (!error) break;
+    if (!error) {
+      return NextResponse.json({ roomId });
+    }
+    lastError = error.message;
     roomId = generateRoomCode();
   }
 
-  return NextResponse.json({ roomId });
+  return NextResponse.json(
+    { error: lastError || "Room creation failed" },
+    { status: 500 }
+  );
 }

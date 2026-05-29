@@ -28,10 +28,19 @@ export default function Home() {
     setIsCreating(true);
     try {
       const response = await fetch("/api/rooms/create", { method: "POST" });
+      if (!response.ok) {
+        const data = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        showToast(data?.error || "Nao foi possivel criar a sala.");
+        return;
+      }
       const data = (await response.json()) as { roomId?: string };
       if (data.roomId) {
         router.push(`/room/${data.roomId}`);
+        return;
       }
+      showToast("Nao foi possivel criar a sala.");
     } finally {
       setIsCreating(false);
     }
