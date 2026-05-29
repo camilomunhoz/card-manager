@@ -37,6 +37,7 @@ import PlayerSeatsLayout from "@/components/PlayerSeatsLayout";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import HistoryButton from "@/components/HistoryButton";
 import HistoryModal from "@/components/HistoryModal";
+import RefreshButton from "@/components/RefreshButton";
 import { useGameScale } from "@/hooks/useGameScale";
 import type { DiceRollState, CardHistoryAction } from "@/lib/types";
 import {
@@ -54,6 +55,9 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const [room, setRoom] = useState<RoomState | null>(null);
   const [historyEntries, setHistoryEntries] = useState<CardHistoryEntry[]>([]);
   const [historyPulseToken, setHistoryPulseToken] = useState(0);
+  const [marketRefreshPulseToken, setMarketRefreshPulseToken] = useState(0);
+  const [marketRefreshPlayerId, setMarketRefreshPlayerId] = useState<string | null>(null);
+  const [marketRefreshSnapshotColor, setMarketRefreshSnapshotColor] = useState<string | null>(null);
   const [playerId, setPlayerId] = useState<string>("");
   const [playerName, setPlayerName] = useState<string>("");
   const [nameDraft, setNameDraft] = useState<string>("");
@@ -193,6 +197,10 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     }
   }, [roomId]);
 
+  const triggerMarketRefreshFeedback = useCallback((color: string | null) => {
+    setMarketRefreshPulseToken((current) => current + 1);
+  }, []);
+
   const joinProfile = useCallback(
     async (nextName: string, nextColor: string) => {
       if (!playerId) return;
@@ -279,6 +287,26 @@ export default function RoomClient({ roomId }: RoomClientProps) {
             return [...current, entry].sort((left, right) => left.createdAt - right.createdAt);
           });
           setHistoryPulseToken((current) => current + 1);
+        }
+      )
+      .on(
+        "broadcast",
+        { event: "market_refresh" },
+        ({ payload }) => {
+          const data = payload as
+            | {
+                playerId?: string | null;
+                playerColor?: string | null;
+                playerColorValue?: string | null;
+                playerName?: string | null;
+                refreshedAt?: number;
+              }
+            | null;
+          setMarketRefreshPlayerId(data?.playerId || null);
+          setMarketRefreshSnapshotColor(data?.playerColorValue || data?.playerColor || null);
+          const colorValue = data?.playerColorValue || (data?.playerColor ? getPlayerColorInfo(data.playerColor).value : null);
+          triggerMarketRefreshFeedback(colorValue);
+          void fetchRoom();
         }
       )
       .on(
@@ -536,6 +564,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     if (!playerId || !confirmReturn) return;
     await withLoading(async () => {
       const player = room?.players[playerId];
+      const wasLastCard = (player?.hand.length ?? 0) === 1;
       const card = player?.hand.find((entry) => entry.id === confirmReturn.cardId);
       const response = await returnCard(roomId, playerId, confirmReturn.cardId, confirmReturn.action);
       const hasError = await handleResponseError(response);
@@ -568,6 +597,10 @@ export default function RoomClient({ roomId }: RoomClientProps) {
             payload: nextEntry,
           });
         }
+        if (wasLastCard) {
+          setIsHandOpen(false);
+          setSelectedHandCardId(null);
+        }
         fetchRoom();
       }
     });
@@ -583,6 +616,21 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       const response = await refreshMarket(roomId, playerId);
       const hasError = await handleResponseError(response);
       if (!hasError) {
+        const refreshColor = player.color ? getPlayerColorInfo(player.color).value : null;
+        setMarketRefreshPlayerId(player.id);
+        setMarketRefreshSnapshotColor(refreshColor);
+        triggerMarketRefreshFeedback(refreshColor);
+        void roomChannelRef.current?.send({
+          type: "broadcast",
+          event: "market_refresh",
+          payload: {
+            playerId: player.id,
+            playerName: player.name,
+            playerColor: player.color || null,
+            playerColorValue: refreshColor,
+            refreshedAt: Date.now(),
+          },
+        });
         setConfirmRefresh(false);
         fetchRoom();
       }
@@ -626,8 +674,22 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const visibleHistoryEntries = historyEntries.length ? historyEntries : (room?.card_history ?? []);
   const latestHistoryEntry = visibleHistoryEntries[visibleHistoryEntries.length - 1] ?? null;
   const latestHistoryGlow = latestHistoryEntry
-    ? getPlayerColorInfo(latestHistoryEntry.playerColor).value
+    ? getPlayerColorInfo(room?.players[latestHistoryEntry.playerId]?.color ?? latestHistoryEntry.playerColor).value
     : null;
+  const latestHistoryPlayer = latestHistoryEntry ? room?.players[latestHistoryEntry.playerId] ?? null : null;
+  const latestHistoryName = latestHistoryPlayer?.name ?? latestHistoryEntry?.playerName ?? null;
+  const latestHistoryActionLabel = latestHistoryEntry?.action === "used" ? "usou" : latestHistoryEntry?.action === "discarded" ? "descartou" : null;
+  const marketRefreshResolvedPlayer = marketRefreshPlayerId ? room?.players[marketRefreshPlayerId] ?? null : null;
+  const resolveStoredColor = (value: string | null) => {
+    if (!value) return null;
+    if (value.startsWith("#") || value.startsWith("rgb") || value.startsWith("hsl")) {
+      return value;
+    }
+    return getPlayerColorInfo(value).value;
+  };
+  const marketRefreshGlow = marketRefreshResolvedPlayer?.color
+    ? getPlayerColorInfo(marketRefreshResolvedPlayer.color).value
+    : resolveStoredColor(marketRefreshSnapshotColor);
 
   const orderedPlayers = useMemo(() => {
     if (!room) return [] as PlayerState[];
@@ -733,8 +795,8 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                 {roomId}
               </p>
               <p className="mb-2 text-center text-[10px] uppercase tracking-[0.22em] text-white/45">
-                {latestHistoryEntry
-                  ? `${latestHistoryEntry.playerName} ${latestHistoryEntry.action === "used" ? "usou" : "descartou"} uma carta`
+                {latestHistoryEntry && latestHistoryName && latestHistoryActionLabel
+                  ? `${latestHistoryName} ${latestHistoryActionLabel} uma carta`
                   : "Nenhuma carta no histórico ainda"}
               </p>
               <div className="mb-2 h-px bg-white/10" />
@@ -983,14 +1045,12 @@ export default function RoomClient({ roomId }: RoomClientProps) {
             ))}
           </div>
 
-          <motion.button
+          <RefreshButton
             onClick={() => setConfirmRefresh(true)}
-            whileHover={{ scale: 1.03 }}
-            whileTap={{ scale: 0.96 }}
-            className="cursor-pointer rounded-full border border-white/20 px-6 py-3 text-base font-semibold uppercase tracking-[0.18em] text-white"
-          >
-            Repor Mercado
-          </motion.button>
+            className="mt-1"
+            glowColor={marketRefreshGlow}
+            pulseToken={marketRefreshPulseToken}
+          />
           <HistoryButton
             onClick={() => setHistoryOpen(true)}
             className="mt-2"
@@ -1044,6 +1104,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
 
       <HistoryModal
         entries={visibleHistoryEntries}
+        players={room?.players || {}}
         isOpen={historyOpen}
         onClose={() => setHistoryOpen(false)}
       />

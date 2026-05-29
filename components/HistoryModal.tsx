@@ -1,16 +1,22 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import type { CardHistoryEntry } from "@/lib/types";
+import type { CardHistoryEntry, PlayerState } from "@/lib/types";
 import { getPlayerColorInfo } from "@/lib/playerColors";
 
 interface HistoryModalProps {
   entries: CardHistoryEntry[];
+  players: Record<string, PlayerState>;
   isOpen: boolean;
   onClose: () => void;
 }
 
 const emptyMessage = "Nenhuma carta foi usada ou descartada ainda.";
+
+const truncateName = (value: string) => {
+  const trimmed = value.trim();
+  return trimmed.length > 7 ? `${trimmed.slice(0, 7)}...` : trimmed;
+};
 
 function HistoryTag({ action }: { action: CardHistoryEntry["action"] }) {
   const label = action === "used" ? "Usada" : "Descartada";
@@ -25,12 +31,14 @@ function HistoryTag({ action }: { action: CardHistoryEntry["action"] }) {
   );
 }
 
-export default function HistoryModal({ entries, isOpen, onClose }: HistoryModalProps) {
+export default function HistoryModal({ entries, players, isOpen, onClose }: HistoryModalProps) {
   const usedEntries = entries.filter((entry) => entry.action === "used").slice().reverse();
   const discardedEntries = entries.filter((entry) => entry.action === "discarded").slice().reverse();
 
   const renderEntry = (entry: CardHistoryEntry) => {
-    const colorInfo = getPlayerColorInfo(entry.playerColor);
+    const resolvedPlayer = players[entry.playerId] ?? null;
+    const colorInfo = getPlayerColorInfo(resolvedPlayer?.color ?? entry.playerColor);
+    const playerLabel = truncateName(resolvedPlayer?.name ?? entry.playerName);
 
     return (
       <div
@@ -68,7 +76,7 @@ export default function HistoryModal({ entries, isOpen, onClose }: HistoryModalP
               backgroundColor: `${colorInfo.value}1A`,
             }}
           >
-            {entry.playerName}
+            {playerLabel}
           </span>
         </div>
       </div>

@@ -5,9 +5,6 @@
   --fg: #f6f2e8;
   --accent: #ff7a59;
   --muted: #b9b5ad;
-}
-
-@theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--fg);
   --font-sans: var(--font-space-grotesk);

@@ -1,7 +1,7 @@
 const PLAYER_KEY = "card-arena-player-id";
 const PLAYER_NAME_KEY = "card-arena-player-name";
 const PLAYER_COLOR_KEY = "card-arena-player-color";
-export const MAX_PLAYER_NAME_LENGTH = 24;
+export const MAX_PLAYER_NAME_LENGTH = 16;
 
 export const normalizePlayerName = (value: string) =>
   value.trim().replace(/\s+/g, " ").slice(0, MAX_PLAYER_NAME_LENGTH);
