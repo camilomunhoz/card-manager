@@ -13,11 +13,15 @@ import {
   getStoredPlayerColor,
   setStoredPlayerName,
   setStoredPlayerColor,
+  MAX_PLAYER_NAME_LENGTH,
+  normalizePlayerName,
 } from "@/lib/playerId";
 import {
   buyFromMarket,
   drawFromDeck,
+  kickPlayer,
   joinRoom,
+  leaveRoom,
   rollDice,
   setPlayerColor,
   refreshMarket,
@@ -64,6 +68,10 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const [confirmReturn, setConfirmReturn] = useState<{
     cardId: string;
     label: string;
+  } | null>(null);
+  const [confirmKick, setConfirmKick] = useState<{
+    playerId: string;
+    playerName: string;
   } | null>(null);
   const [confirmRefresh, setConfirmRefresh] = useState(false);
   const [deckModalOpen, setDeckModalOpen] = useState(false);
@@ -176,7 +184,8 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       }
 
       await withLoading(async () => {
-        const joinResponse = await joinRoom(roomId, playerId, nextName);
+        const normalizedName = normalizePlayerName(nextName);
+        const joinResponse = await joinRoom(roomId, playerId, normalizedName);
         const joinFailed = await handleResponseError(joinResponse);
         if (joinFailed) return;
 
@@ -323,6 +332,11 @@ export default function RoomClient({ roomId }: RoomClientProps) {
         return;
       }
 
+      if (confirmKick) {
+        setConfirmKick(null);
+        return;
+      }
+
       if (confirmRefresh) {
         setConfirmRefresh(false);
         return;
@@ -339,6 +353,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     allCardsOpen,
     confirmRefresh,
     confirmReturn,
+    confirmKick,
     deckModalOpen,
     isHandOpen,
     namePromptOpen,
@@ -461,7 +476,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   };
 
   const commitProfile = useCallback(() => {
-    const nextName = nameDraft.trim();
+    const nextName = normalizePlayerName(nameDraft);
     const nextColor = colorDraft || DEFAULT_PLAYER_COLOR;
     if (!nextName) {
       showToast("Informe um nome.");
@@ -501,6 +516,32 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     });
   };
 
+  const handleKick = async () => {
+    if (!playerId || !confirmKick) return;
+    await withLoading(async () => {
+      const response = await kickPlayer(roomId, playerId, confirmKick.playerId);
+      const hasError = await handleResponseError(response);
+      if (!hasError) {
+        setConfirmKick(null);
+        fetchRoom();
+      }
+    });
+  };
+
+  const handleLeaveRoom = async () => {
+    if (!playerId) {
+      router.push("/");
+      return;
+    }
+    await withLoading(async () => {
+      const response = await leaveRoom(roomId, playerId);
+      const hasError = await handleResponseError(response);
+      if (!hasError) {
+        router.push("/");
+      }
+    });
+  };
+
   const handCards = player?.hand ?? [];
 
   const gs = useGameScale(viewport);
@@ -532,6 +573,19 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     });
     return ids;
   }, [orderedPlayers, playerId]);
+
+  const firstAvailableColorId = useMemo(() => {
+    return (
+      PLAYER_COLORS.find((entry) => !takenColorIds.has(entry.id))?.id ||
+      DEFAULT_PLAYER_COLOR
+    );
+  }, [takenColorIds]);
+
+  useEffect(() => {
+    if (!namePromptOpen) return;
+    if (!takenColorIds.has(colorDraft)) return;
+    setColorDraft(firstAvailableColorId);
+  }, [colorDraft, firstAvailableColorId, namePromptOpen, takenColorIds]);
 
   const availableByClass = useMemo(() => {
     if (!room) return { Resiliente: [], Sinergista: [], Impetuoso: [] };
@@ -599,7 +653,9 @@ export default function RoomClient({ roomId }: RoomClientProps) {
               </p>
               <div className="mb-2 h-px bg-white/10" />
               <button
-                onClick={() => router.push("/")}
+                onClick={() => {
+                  void handleLeaveRoom();
+                }}
                 className="w-full rounded-lg px-3 py-2 text-left hover:bg-white/10"
               >
                 Sair da Sala
@@ -649,6 +705,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                 orderedPlayers={orderedPlayers}
                 playerId={playerId}
                 playerName={playerName}
+                masterId={room?.master_id || null}
                 handCardsLength={handCards.length}
                 viewport={viewport}
                 gameScale={gs}
@@ -659,6 +716,12 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                   setColorDraft(currentColor);
                   setNamePromptOpen(true);
                 }}
+                onKickPlayer={room?.master_id === playerId ? (targetPlayerId) => {
+                  if (targetPlayerId === playerId) return;
+                  const targetPlayer = room.players[targetPlayerId];
+                  if (!targetPlayer) return;
+                  setConfirmKick({ playerId: targetPlayerId, playerName: targetPlayer.name });
+                } : undefined}
                 onOpenHand={() => {
                   if (handCards.length === 0) return;
                   setIsHandOpen((open) => !open);
@@ -885,6 +948,15 @@ export default function RoomClient({ roomId }: RoomClientProps) {
         onConfirm={handleRefresh}
       />
 
+      <ConfirmDialog
+        isOpen={Boolean(confirmKick)}
+        title={confirmKick ? `Expulsar ${confirmKick.playerName}` : "Expulsar jogador"}
+        description="Esse jogador será removido da sala."
+        confirmLabel="Expulsar"
+        onCancel={() => setConfirmKick(null)}
+        onConfirm={handleKick}
+      />
+
       <AnimatePresence>
         {allCardsOpen && (
           <motion.div
@@ -979,7 +1051,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                   if (event.key === "Enter") commitProfile();
                 }}
                 placeholder="Digite seu nome"
-                maxLength={24}
+                maxLength={MAX_PLAYER_NAME_LENGTH}
                 autoFocus
                 className="mt-4 w-full rounded-full border border-white/20 bg-black/30 px-4 py-3 text-sm uppercase tracking-widest text-white placeholder:text-white/40 focus:outline-none focus:ring-2 focus:ring-[color:var(--accent)]"
               />

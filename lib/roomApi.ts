@@ -62,3 +62,21 @@ export const refreshMarket = async (roomId: string) =>
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ roomId }),
   });
+
+export const leaveRoom = async (roomId: string, playerId: string) =>
+  fetch("/api/rooms/leave", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ roomId, playerId }),
+  });
+
+export const kickPlayer = async (
+  roomId: string,
+  playerId: string,
+  targetPlayerId: string
+) =>
+  fetch("/api/rooms/kick", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ roomId, playerId, targetPlayerId }),
+  });

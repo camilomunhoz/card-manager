@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { PlayerState, RoomState } from "@/lib/types";
 import { DEFAULT_PLAYER_COLOR, normalizePlayerColors } from "@/lib/playerColors";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { normalizePlayerName } from "@/lib/playerId";
 
 export async function POST(request: Request) {
   const body = (await request.json()) as {
@@ -10,7 +11,7 @@ export async function POST(request: Request) {
     playerName?: string;
   };
 
-  const name = body.playerName?.trim();
+  const name = normalizePlayerName(body.playerName || "");
 
   if (!body.roomId || !body.playerId || !name) {
     return NextResponse.json({ error: "Missing data" }, { status: 400 });
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
 
   const room = data as RoomState;
   const existing = room.players[body.playerId];
+  const masterId = room.master_id || body.playerId;
   if (!existing) {
     const player: PlayerState = {
       id: body.playerId,
@@ -41,7 +43,10 @@ export async function POST(request: Request) {
       body.playerId,
       player.color
     );
-    await supabaseAdmin.from("rooms").update({ players }).eq("id", room.id);
+    await supabaseAdmin
+      .from("rooms")
+      .update({ players, master_id: masterId })
+      .eq("id", room.id);
   } else {
     const needsNameUpdate = existing.name !== name;
     const needsJoinUpdate = !Number.isFinite(existing.joinedAt);
@@ -58,10 +63,16 @@ export async function POST(request: Request) {
         body.playerId,
         player.color
       );
-      await supabaseAdmin.from("rooms").update({ players }).eq("id", room.id);
+      await supabaseAdmin
+        .from("rooms")
+        .update({ players, master_id: masterId })
+        .eq("id", room.id);
     } else if (needsColorUpdate) {
       const players = normalizePlayerColors(room.players, body.playerId, DEFAULT_PLAYER_COLOR);
-      await supabaseAdmin.from("rooms").update({ players }).eq("id", room.id);
+      await supabaseAdmin
+        .from("rooms")
+        .update({ players, master_id: masterId })
+        .eq("id", room.id);
     }
   }
 

@@ -15,9 +15,11 @@ interface PlayerSeatProps {
   player: PlayerState;
   displayName: string;
   isSelf: boolean;
+  isMaster: boolean;
   seatScale: number;
   cardScale: number;
   onClickHand?: () => void;
+  onClickOtherPlayer?: () => void;
   onEditProfile?: () => void;
   renderMode: CardRenderMode;
 }
@@ -26,9 +28,11 @@ function PlayerSeat({
   player,
   displayName,
   isSelf,
+  isMaster,
   seatScale,
   cardScale,
   onClickHand,
+  onClickOtherPlayer,
   onEditProfile,
   renderMode,
 }: PlayerSeatProps) {
@@ -40,9 +44,9 @@ function PlayerSeat({
 
   return (
     <motion.div
-      className={`flex flex-col items-center ${isSelf ? "cursor-pointer" : "pointer-events-none"}`}
+      className={`flex flex-col items-center ${isSelf || onClickOtherPlayer ? "cursor-pointer" : "pointer-events-none"}`}
       style={{ scale: seatScale * selfScale, transformOrigin: "center" }}
-      onClick={onClickHand}
+      onClick={isSelf ? onClickHand : onClickOtherPlayer}
     >
       <div className="relative z-20 mb-1 whitespace-nowrap">
         {isSelf ? (
@@ -55,6 +59,14 @@ function PlayerSeat({
             className="inline-flex items-center gap-2 rounded-full px-1 py-0.5 text-[10px] uppercase tracking-[0.2em] text-white/75 transition hover:text-white"
           >
             <span>{displayName}</span>
+            {isMaster && (
+              <span
+                aria-label="Master da sala"
+                className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[color:var(--accent)]/35 bg-[color:var(--accent)]/15 text-[10px] leading-none text-[color:var(--accent)]"
+              >
+                M
+              </span>
+            )}
             <span
               className="inline-flex h-5 min-w-6 items-center justify-center rounded-full border border-white/15 px-2 text-[10px] font-black uppercase leading-none tabular-nums tracking-[0.18em]"
               style={{
@@ -71,6 +83,14 @@ function PlayerSeat({
             <span className="text-[10px] uppercase tracking-[0.2em] text-white/70">
               {displayName}
             </span>
+            {isMaster && (
+              <span
+                aria-label="Master da sala"
+                className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-[color:var(--accent)]/35 bg-[color:var(--accent)]/15 text-[10px] leading-none text-[color:var(--accent)]"
+              >
+                M
+              </span>
+            )}
             <span
               className="inline-flex h-5 min-w-6 items-center justify-center rounded-full border border-white/15 px-2 text-[10px] font-black uppercase leading-none tabular-nums tracking-[0.18em]"
               style={{
@@ -160,11 +180,13 @@ interface PlayerSeatsLayoutProps {
   orderedPlayers: PlayerState[];
   playerId: string;
   playerName: string;
+  masterId: string | null;
   handCardsLength: number;
   viewport: { width: number; height: number };
   gameScale: GameScale;
   onOpenHand: () => void;
   onEditProfile: () => void;
+  onKickPlayer?: (playerId: string) => void;
   renderMode?: CardRenderMode;
 }
 
@@ -172,11 +194,13 @@ export default function PlayerSeatsLayout({
   orderedPlayers,
   playerId,
   playerName,
+  masterId,
   handCardsLength,
   viewport,
   gameScale,
   onOpenHand,
   onEditProfile,
+  onKickPlayer,
   renderMode = "safe",
 }: PlayerSeatsLayoutProps) {
   const seats = computeSeats(orderedPlayers.length);
@@ -191,6 +215,7 @@ export default function PlayerSeatsLayout({
         const slot = seats[index];
         if (!slot) return null;
         const isSelf = seatPlayer.id === playerId;
+        const isMaster = seatPlayer.id === masterId;
         const displayName = seatPlayer.name || (isSelf ? playerName : "Jogador");
         const label = isSelf ? `${displayName} (você)` : displayName;
 
@@ -212,9 +237,13 @@ export default function PlayerSeatsLayout({
               player={seatPlayer}
               displayName={label}
               isSelf={isSelf}
+              isMaster={isMaster}
               seatScale={seatScale}
               cardScale={fanCardScale}
               onEditProfile={isSelf ? onEditProfile : undefined}
+              onClickOtherPlayer={
+                !isSelf && onKickPlayer ? () => onKickPlayer(seatPlayer.id) : undefined
+              }
               renderMode={renderMode}
             />
           </div>
