@@ -56,11 +56,11 @@ export const returnCard = async (
     body: JSON.stringify({ roomId, playerId, cardId }),
   });
 
-export const refreshMarket = async (roomId: string) =>
+export const refreshMarket = async (roomId: string, playerId: string) =>
   fetch("/api/rooms/refresh", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ roomId }),
+    body: JSON.stringify({ roomId, playerId }),
   });
 
 export const leaveRoom = async (roomId: string, playerId: string) =>

@@ -4,9 +4,9 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { fillMarket } from "@/lib/cards";
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as { roomId?: string };
+  const body = (await request.json()) as { roomId?: string; playerId?: string };
 
-  if (!body.roomId) {
+  if (!body.roomId || !body.playerId) {
     return NextResponse.json({ error: "Missing data" }, { status: 400 });
   }
 
@@ -21,6 +21,9 @@ export async function POST(request: Request) {
   }
 
   const room = data as RoomState;
+  if (!room.players[body.playerId]) {
+    return NextResponse.json({ error: "Player not in room" }, { status: 404 });
+  }
   const marketToDeck = room.market_cards.filter((c): c is CardData => Boolean(c));
   const deck_queue = [...room.deck_queue, ...marketToDeck];
 

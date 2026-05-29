@@ -506,8 +506,13 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   };
 
   const handleRefresh = async () => {
+    if (!player || !room?.players[playerId]) {
+      showToast("Voce foi removido da sala.");
+      router.push("/");
+      return;
+    }
     await withLoading(async () => {
-      const response = await refreshMarket(roomId);
+      const response = await refreshMarket(roomId, playerId);
       const hasError = await handleResponseError(response);
       if (!hasError) {
         setConfirmRefresh(false);
@@ -546,7 +551,10 @@ export default function RoomClient({ roomId }: RoomClientProps) {
 
   const gs = useGameScale(viewport);
   const isCompact = Boolean(viewport.width && (viewport.width < 640 || viewport.height < 520));
-  const compactActiveCard = selectedCard ?? (handCards.length > 0 ? handCards[0] : null);
+  const compactActiveCard = useMemo(
+    () => handCards.find((card) => card.id === selectedHandCardId) || handCards[0] || null,
+    [handCards, selectedHandCardId]
+  );
 
   const orderedPlayers = useMemo(() => {
     if (!room) return [] as PlayerState[];
@@ -792,6 +800,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                           <motion.button
                             onClick={(event) => {
                               event.stopPropagation();
+                              setSelectedHandCardId(card.id);
                               setConfirmReturn({ cardId: card.id, label: "Usar" });
                             }}
                             whileHover={{ scale: 1.03 }}
@@ -803,6 +812,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                           <motion.button
                             onClick={(event) => {
                               event.stopPropagation();
+                              setSelectedHandCardId(card.id);
                               setConfirmReturn({ cardId: card.id, label: "Descartar" });
                             }}
                             whileHover={{ scale: 1.03 }}
@@ -818,7 +828,6 @@ export default function RoomClient({ roomId }: RoomClientProps) {
 
                   {isCompact && compactActiveCard && (
                     <div className="fixed bottom-4 left-4 right-4 z-60 mx-auto w-[calc(100%-2rem)] max-w-lg rounded-2xl bg-black/80 p-3 backdrop-blur">
-                      <div className="mb-2 text-sm text-white/70">{compactActiveCard.titulo}</div>
                       <div className="flex gap-3">
                         <motion.button
                           onClick={() => setConfirmReturn({ cardId: compactActiveCard.id, label: "Usar" })}
