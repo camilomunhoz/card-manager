@@ -31,7 +31,12 @@ export default function CardModal({
 
   useEffect(() => {
     const update = () => {
-      setZoom(Math.min(3, window.innerWidth / 240, window.innerHeight / 144));
+      const isCompact = window.matchMedia("(max-width: 640px)").matches || window.innerHeight < 520;
+      const maxScale = isCompact ? 1.45 : 3;
+      const usableWidth = window.innerWidth - (isCompact ? 40 : 96);
+      const usableHeight = window.innerHeight - (isCompact ? 180 : 160);
+
+      setZoom(Math.max(0.9, Math.min(maxScale, usableWidth / 240, usableHeight / 144)));
     };
     update();
     window.addEventListener("resize", update);
@@ -52,7 +57,7 @@ export default function CardModal({
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 12 }}
-            className="flex flex-col items-center gap-6"
+            className="flex max-w-[92vw] flex-col items-center gap-4 px-3 sm:max-w-none sm:gap-6 sm:px-0"
             transition={{ duration: 0.25, ease: "easeOut" }}
           >
             <ScaledCard
