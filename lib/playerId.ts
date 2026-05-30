@@ -1,5 +1,10 @@
 const PLAYER_KEY = "card-arena-player-id";
 const PLAYER_NAME_KEY = "card-arena-player-name";
+const PLAYER_COLOR_KEY = "card-arena-player-color";
+export const MAX_PLAYER_NAME_LENGTH = 16;
+
+export const normalizePlayerName = (value: string) =>
+  value.trim().replace(/\s+/g, " ").slice(0, MAX_PLAYER_NAME_LENGTH);
 
 const fallbackUUID = () => {
   const hex = "0123456789abcdef";
@@ -36,4 +41,14 @@ export const getStoredPlayerName = () => {
 export const setStoredPlayerName = (name: string) => {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(PLAYER_NAME_KEY, name);
+};
+
+export const getStoredPlayerColor = () => {
+  if (typeof window === "undefined") return "";
+  return window.localStorage.getItem(PLAYER_COLOR_KEY) || "";
+};
+
+export const setStoredPlayerColor = (color: string) => {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(PLAYER_COLOR_KEY, color);
 };

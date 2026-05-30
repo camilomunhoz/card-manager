@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
-import type { CardData, RoomState } from "@/lib/types";
+import type { DiceRollState, RoomState } from "@/lib/types";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { fillMarket } from "@/lib/cards";
+
+const outcomes = ["+Eco", "+Motiv.", "+Regen."] as const;
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as { roomId?: string; playerId?: string };
+  const body = (await request.json()) as {
+    roomId?: string;
+    playerId?: string;
+  };
 
   if (!body.roomId || !body.playerId) {
     return NextResponse.json({ error: "Missing data" }, { status: 400 });
@@ -24,15 +28,12 @@ export async function POST(request: Request) {
   if (!room.players[body.playerId]) {
     return NextResponse.json({ error: "Player not in room" }, { status: 404 });
   }
-  const marketToDeck = room.market_cards.filter((c): c is CardData => Boolean(c));
-  const deck_queue = [...room.deck_queue, ...marketToDeck];
 
-  const { market, remaining } = fillMarket(deck_queue, 4);
+  const roll: DiceRollState = {
+    value: outcomes[Math.floor(Math.random() * outcomes.length)],
+    playerId: body.playerId,
+    rolledAt: Date.now(),
+  };
 
-  await supabaseAdmin
-    .from("rooms")
-    .update({ deck_queue: remaining, market_cards: market })
-    .eq("id", room.id);
-
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, roll });
 }

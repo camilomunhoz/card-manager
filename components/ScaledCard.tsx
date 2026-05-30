@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import type { CardData } from "@/lib/types";
-import GameCard from "./GameCard";
+import GameCard, { type CardRenderMode } from "./GameCard";
 
 interface ScaledCardProps {
   card: CardData | null;
@@ -12,6 +12,7 @@ interface ScaledCardProps {
   onClick?: () => void;
   layoutId?: string;
   className?: string;
+  renderMode?: CardRenderMode;
 }
 
 const CARD_W = 240;
@@ -25,16 +26,21 @@ export default function ScaledCard({
   onClick,
   layoutId,
   className = "",
+  renderMode = "safe",
 }: ScaledCardProps) {
+  const isInteractive = Boolean(onClick);
+
   return (
     <motion.div
       layoutId={layoutId}
       onClick={onClick}
+      whileHover={isInteractive ? { scale: 1.03 } : undefined}
+      whileTap={isInteractive ? { scale: 0.98 } : undefined}
       style={{
         width: CARD_W * scale,
         height: CARD_H * scale,
       }}
-      className={`relative ${className}`}
+      className={`relative ${isInteractive ? "cursor-pointer" : ""} ${className}`}
     >
       <div
         style={{
@@ -49,6 +55,7 @@ export default function ScaledCard({
           card={card}
           isFaceUp={isFaceUp}
           disableFlip={disableFlip}
+          renderMode={renderMode}
         />
       </div>
     </motion.div>

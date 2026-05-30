@@ -28,10 +28,19 @@ export default function Home() {
     setIsCreating(true);
     try {
       const response = await fetch("/api/rooms/create", { method: "POST" });
+      if (!response.ok) {
+        const data = (await response.json().catch(() => null)) as
+          | { error?: string }
+          | null;
+        showToast(data?.error || "Nao foi possivel criar a sala.");
+        return;
+      }
       const data = (await response.json()) as { roomId?: string };
       if (data.roomId) {
         router.push(`/room/${data.roomId}`);
+        return;
       }
+      showToast("Nao foi possivel criar a sala.");
     } finally {
       setIsCreating(false);
     }
@@ -57,44 +66,47 @@ export default function Home() {
   };
 
   return (
-    <div className="flex flex-1 items-center justify-center px-6 py-16">
-      <main className="w-full max-w-3xl rounded-3xl border border-white/10 bg-black/40 p-10 shadow-[0_25px_80px_rgba(0,0,0,0.45)] backdrop-blur">
-        <p className="font-display text-5xl uppercase tracking-wide text-white">
-          Playtest <small className="ml-5">Freud Explica - Versão Medieval</small>
+    <div className="min-h-screen flex-1 px-4 py-8 sm:px-6 sm:py-16">
+      <main className="mx-auto w-full max-w-3xl rounded-3xl border border-white/10 bg-black/40 p-6 shadow-[0_25px_80px_rgba(0,0,0,0.45)] backdrop-blur sm:p-10">
+        <p className="font-display text-3xl uppercase leading-[0.95] tracking-wide text-white sm:text-5xl">
+          <span className="block">Playtest</span>
+          <span className="mt-2 block text-2xl sm:mt-0 sm:ml-5 sm:inline sm:text-5xl">
+            Freud Explica - Versão Medieval
+          </span>
         </p>
-        <p className="mt-3 max-w-xl text-base text-[color:var(--muted)]">
+        <p className="mt-4 max-w-xl text-sm leading-relaxed text-[color:var(--muted)] sm:text-base">
           Enquanto não temos 23874239 cartas de ação impressas, vamos usar esse carinha aqui para simular o baralho.
         </p>
-        <div className="mt-10 grid gap-6 md:grid-cols-2">
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-            <h2 className="font-display text-3xl uppercase tracking-wide text-white">
+        <div className="mt-8 grid gap-4 md:mt-10 md:grid-cols-2 md:gap-6">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 sm:p-6">
+            <h2 className="font-display text-2xl uppercase tracking-wide text-white sm:text-3xl">
               Nova Sala
             </h2>
-            <p className="mt-2 text-sm text-[color:var(--muted)]">
+            <p className="mt-2 text-sm leading-relaxed text-[color:var(--muted)]">
               O baralho é inicializado automaticamente.
             </p>
             <button
               onClick={createRoom}
               disabled={isCreating}
-              className="mt-6 w-full rounded-full bg-[color:var(--accent)] px-5 py-3 text-sm font-semibold uppercase tracking-wide text-black transition hover:brightness-110 disabled:opacity-70"
+              className="mt-5 w-full rounded-full bg-[color:var(--accent)] px-5 py-3 text-sm font-semibold uppercase tracking-wide text-black transition hover:brightness-110 disabled:opacity-70 sm:mt-6"
             >
               {isCreating ? "Criando..." : "Criar Sala"}
             </button>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-6">
-            <h2 className="font-display text-3xl uppercase tracking-wide text-white">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-5 sm:p-6">
+            <h2 className="font-display text-2xl uppercase tracking-wide text-white sm:text-3xl">
               Entrar
             </h2>
-            <p className="mt-2 text-sm text-[color:var(--muted)]">
+            <p className="mt-2 text-sm leading-relaxed text-[color:var(--muted)]">
               Digite o codigo para entrar em uma sala existente.
             </p>
-            <div className="mt-6 flex w-full items-center rounded-full border border-white/20 bg-black/30">
-              <span className="pl-4 text-sm uppercase tracking-widest text-white/60">ROOM-</span>
+            <div className="mt-5 flex w-full items-center rounded-full border border-white/20 bg-black/30 pr-2 sm:mt-6">
+              <span className="pl-4 text-xs uppercase tracking-widest text-white/60 sm:text-sm">ROOM-</span>
               <input
                 value={roomCode.replace("ROOM-", "")}
                 onChange={(event) => setRoomCode("ROOM-" + event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))}
                 placeholder="1234"
-                className="flex-1 bg-transparent pl-0 pr-2 py-3 text-sm uppercase tracking-widest text-white placeholder:text-white/40 focus:outline-none"
+                className="flex-1 bg-transparent pl-0 pr-1 py-3 text-sm uppercase tracking-widest text-white placeholder:text-white/40 focus:outline-none sm:pr-2"
               />
             </div>
             <button

@@ -24,17 +24,36 @@ export async function POST() {
   const { market, remaining } = fillMarket(shuffled, 4);
 
   let roomId = generateRoomCode();
+  let lastError: string | null = null;
   for (let attempt = 0; attempt < 3; attempt += 1) {
-    const { error } = await supabaseAdmin.from("rooms").insert({
+    const baseRoom = {
       id: roomId,
       master_id: null,
       deck_queue: remaining,
       market_cards: market,
       players: {},
+    };
+
+    const { error } = await supabaseAdmin.from("rooms").insert({
+      ...baseRoom,
+      card_history: [],
     });
-    if (!error) break;
+
+    if (!error) {
+      return NextResponse.json({ roomId });
+    }
+
+    const fallbackInsert = await supabaseAdmin.from("rooms").insert(baseRoom);
+    if (!fallbackInsert.error) {
+      return NextResponse.json({ roomId });
+    }
+
+    lastError = fallbackInsert.error?.message || error.message;
     roomId = generateRoomCode();
   }
 
-  return NextResponse.json({ roomId });
+  return NextResponse.json(
+    { error: lastError || "Room creation failed" },
+    { status: 500 }
+  );
 }
