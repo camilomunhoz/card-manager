@@ -566,6 +566,11 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       const player = room?.players[playerId];
       const wasLastCard = (player?.hand.length ?? 0) === 1;
       const card = player?.hand.find((entry) => entry.id === confirmReturn.cardId);
+      if (!card) {
+        showToast("Nenhuma carta selecionada.");
+        setConfirmReturn(null);
+        return;
+      }
       const response = await returnCard(roomId, playerId, confirmReturn.cardId, confirmReturn.action);
       const hasError = await handleResponseError(response);
       if (!hasError) {
@@ -667,10 +672,10 @@ export default function RoomClient({ roomId }: RoomClientProps) {
 
   const gs = useGameScale(viewport);
   const isCompact = Boolean(viewport.width && (viewport.width < 640 || viewport.height < 520));
-  const compactActiveCard = useMemo(
-    () => handCards.find((card) => card.id === selectedHandCardId) || handCards[0] || null,
-    [handCards, selectedHandCardId]
-  );
+  const compactActiveCard = useMemo(() => {
+    if (!selectedHandCardId) return null;
+    return handCards.find((card) => card.id === selectedHandCardId) ?? null;
+  }, [handCards, selectedHandCardId]);
   const visibleHistoryEntries = historyEntries.length ? historyEntries : (room?.card_history ?? []);
   const latestHistoryEntry = visibleHistoryEntries[visibleHistoryEntries.length - 1] ?? null;
   const latestHistoryGlow = latestHistoryEntry
@@ -954,7 +959,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                             }}
                             whileHover={{ scale: 1.03 }}
                             whileTap={{ scale: 0.96 }}
-                            className="w-full rounded-full bg-[color:var(--accent)] px-4 py-2 text-xs font-semibold uppercase tracking-wide text-black sm:w-auto"
+                            className="w-full rounded-full bg-emerald-400/20 border border-emerald-400/30 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white sm:w-auto"
                           >
                             Usar
                           </motion.button>
@@ -966,7 +971,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                             }}
                             whileHover={{ scale: 1.03 }}
                             whileTap={{ scale: 0.96 }}
-                            className="w-full rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white sm:w-auto"
+                            className="w-full rounded-full bg-amber-400/20 border border-amber-400/30 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white sm:w-auto"
                           >
                             Descartar
                           </motion.button>
@@ -982,7 +987,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                           onClick={() => setConfirmReturn({ cardId: compactActiveCard.id, label: "Usar", action: "used" })}
                           whileHover={{ scale: 1.03 }}
                           whileTap={{ scale: 0.96 }}
-                          className="flex-1 rounded-full bg-[color:var(--accent)] px-4 py-3 text-sm font-semibold uppercase tracking-wide text-black"
+                          className="flex-1 rounded-full bg-emerald-400/20 border border-emerald-400/30 px-4 py-3 text-sm font-semibold uppercase tracking-wide text-white"
                         >
                           Usar
                         </motion.button>
@@ -990,7 +995,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
                           onClick={() => setConfirmReturn({ cardId: compactActiveCard.id, label: "Descartar", action: "discarded" })}
                           whileHover={{ scale: 1.03 }}
                           whileTap={{ scale: 0.96 }}
-                          className="flex-1 rounded-full border border-white/20 px-4 py-3 text-sm font-semibold uppercase tracking-wide text-white"
+                          className="flex-1 rounded-full bg-amber-400/20 border border-amber-400/30 px-4 py-3 text-sm font-semibold uppercase tracking-wide text-white"
                         >
                           Descartar
                         </motion.button>
