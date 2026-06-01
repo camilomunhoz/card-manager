@@ -85,6 +85,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const [confirmRefresh, setConfirmRefresh] = useState(false);
   const [deckModalOpen, setDeckModalOpen] = useState(false);
   const [deckRevealCard, setDeckRevealCard] = useState<CardData | null>(null);
+  const [deckRevealFaceUp, setDeckRevealFaceUp] = useState(false);
   const [allCardsOpen, setAllCardsOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -96,6 +97,10 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   const diceRollTimerRef = useRef<number | null>(null);
   const pendingDiceRollRef = useRef<DiceRollState | null>(null);
   const colorRecheckTimerRef = useRef<number | null>(null);
+  const deckRevealTimerRef = useRef<{
+    flip: number | null;
+    close: number | null;
+  }>({ flip: null, close: null });
 
   useEffect(() => {
     const id = getOrCreatePlayerId();
@@ -174,6 +179,20 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     }
     return true;
   }, [playerId, roomId, showToast]);
+
+  const clearDeckRevealTimers = useCallback(() => {
+    if (deckRevealTimerRef.current.flip) {
+      window.clearTimeout(deckRevealTimerRef.current.flip);
+      deckRevealTimerRef.current.flip = null;
+    }
+  }, []);
+
+  const closeDeckReveal = useCallback(() => {
+    clearDeckRevealTimers();
+    setDeckModalOpen(false);
+    setDeckRevealCard(null);
+    setDeckRevealFaceUp(false);
+  }, [clearDeckRevealTimers]);
 
   const fetchRoom = useCallback(async () => {
     if (!roomId || roomId === "undefined") return;
@@ -383,8 +402,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       }
 
       if (deckModalOpen) {
-        setDeckModalOpen(false);
-        setDeckRevealCard(null);
+        closeDeckReveal();
         return;
       }
 
@@ -425,6 +443,7 @@ export default function RoomClient({ roomId }: RoomClientProps) {
     isHandOpen,
     namePromptOpen,
     selectedCard,
+    closeDeckReveal,
   ]);
 
   useEffect(() => {
@@ -434,6 +453,28 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (!deckModalOpen || !deckRevealCard) {
+      clearDeckRevealTimers();
+      if (!deckModalOpen) {
+        setDeckRevealFaceUp(false);
+      }
+      return;
+    }
+
+    clearDeckRevealTimers();
+    setDeckRevealFaceUp(false);
+
+    const flipDelay = cardRenderMode === "classic" ? 140 : 0;
+
+    deckRevealTimerRef.current.flip = window.setTimeout(() => {
+      setDeckRevealFaceUp(true);
+      deckRevealTimerRef.current.flip = null;
+    }, flipDelay);
+
+    return clearDeckRevealTimers;
+  }, [cardRenderMode, clearDeckRevealTimers, closeDeckReveal, deckModalOpen, deckRevealCard]);
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -519,9 +560,16 @@ export default function RoomClient({ roomId }: RoomClientProps) {
       const response = await drawFromDeck(roomId, playerId);
       const hasError = await handleResponseError(response);
       if (!hasError) {
-        await response.json().catch(() => null);
-        setDeckModalOpen(false);
-        setDeckRevealCard(null);
+        const data = (await response.json().catch(() => null)) as
+          | { card?: CardData }
+          | null;
+        if (data?.card) {
+          setDeckRevealCard(data.card);
+          setDeckRevealFaceUp(false);
+          setDeckModalOpen(true);
+        } else {
+          closeDeckReveal();
+        }
         showToast("Carta comprada do monte.");
         fetchRoom();
       }
@@ -1021,7 +1069,9 @@ export default function RoomClient({ roomId }: RoomClientProps) {
               h={gs.deckH}
               renderMode={cardRenderMode}
               onClick={() => {
+                clearDeckRevealTimers();
                 setDeckRevealCard(null);
+                setDeckRevealFaceUp(false);
                 setDeckModalOpen(true);
               }}
             />
@@ -1082,13 +1132,10 @@ export default function RoomClient({ roomId }: RoomClientProps) {
         card={deckRevealCard}
         isOpen={deckModalOpen}
         actionLabel={deckRevealCard ? undefined : "Comprar do Monte"}
-        showBackOnly={!deckRevealCard}
-        disableFlip={!deckRevealCard}
+        showBackOnly={!deckRevealFaceUp}
+        disableFlip={cardRenderMode === "safe"}
         renderMode={cardRenderMode}
-        onClose={() => {
-          setDeckModalOpen(false);
-          setDeckRevealCard(null);
-        }}
+        onClose={closeDeckReveal}
         onConfirm={
           deckRevealCard
             ? undefined
