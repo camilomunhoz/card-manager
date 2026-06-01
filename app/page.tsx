@@ -68,12 +68,15 @@ export default function Home() {
   return (
     <div className="min-h-screen flex-1 px-4 py-8 sm:px-6 sm:py-16">
       <main className="mx-auto w-full max-w-3xl rounded-3xl border border-white/10 bg-black/40 p-6 shadow-[0_25px_80px_rgba(0,0,0,0.45)] backdrop-blur sm:p-10">
-        <p className="font-display text-3xl uppercase leading-[0.95] tracking-wide text-white sm:text-5xl">
-          <span className="block">Playtest</span>
-          <span className="mt-2 block text-2xl sm:mt-0 sm:ml-5 sm:inline sm:text-5xl">
-            Freud Explica - Versão Medieval
-          </span>
-        </p>
+        <div className="max-w-2xl">
+          <p className="font-display text-sm uppercase tracking-[0.45em] text-white/65 sm:text-base">
+            Playtest
+          </p>
+          <h1 className="mt-3 text-4xl font-semibold leading-[0.92] tracking-tight text-white sm:text-6xl">
+            <span className="block">Freud Explica</span>
+            <span className="block text-[color:var(--accent)]">Versão Medieval</span>
+          </h1>
+        </div>
         <p className="mt-4 max-w-xl text-sm leading-relaxed text-[color:var(--muted)] sm:text-base">
           Enquanto não temos 23874239 cartas de ação impressas, vamos usar esse carinha aqui para simular o baralho.
         </p>
@@ -88,7 +91,7 @@ export default function Home() {
             <button
               onClick={createRoom}
               disabled={isCreating}
-              className="mt-5 w-full rounded-full bg-[color:var(--accent)] px-5 py-3 text-sm font-semibold uppercase tracking-wide text-black transition hover:brightness-110 disabled:opacity-70 sm:mt-6"
+              className="mt-5 w-full rounded-full bg-[color:var(--accent)] px-5 py-3 text-sm font-semibold uppercase tracking-wide text-black transition duration-200 hover:scale-[1.03] hover:brightness-110 disabled:opacity-70 sm:mt-6"
             >
               {isCreating ? "Criando..." : "Criar Sala"}
             </button>
@@ -112,7 +115,7 @@ export default function Home() {
             <button
               onClick={joinRoom}
               disabled={isJoining}
-              className="mt-4 w-full rounded-full border border-white/20 px-5 py-3 text-sm font-semibold uppercase tracking-wide text-white transition hover:border-[color:var(--accent)] disabled:opacity-70"
+              className="mt-4 w-full rounded-full border border-white/20 px-5 py-3 text-sm font-semibold uppercase tracking-wide text-white transition duration-200 hover:scale-[1.03] hover:border-[color:var(--accent)] disabled:opacity-70"
             >
               {isJoining ? "Verificando..." : "Entrar na Sala"}
             </button>
