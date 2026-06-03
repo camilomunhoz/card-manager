@@ -45,6 +45,11 @@ import {
   getPlayerColorInfo,
   PLAYER_COLORS,
 } from "@/lib/playerColors";
+import {
+  hasPersistentBrowserStorage,
+  getStoredValue,
+  setStoredValue,
+} from "@/lib/browserStorage";
 
 interface RoomClientProps {
   roomId: string;
@@ -115,14 +120,17 @@ export default function RoomClient({ roomId }: RoomClientProps) {
   }, []);
 
   useEffect(() => {
-    const storedMode = window.localStorage.getItem("card-render-mode");
+    const storedMode = getStoredValue("card-render-mode");
     if (storedMode === "safe" || storedMode === "classic") {
       setCardRenderMode(storedMode);
+    }
+    if (!hasPersistentBrowserStorage()) {
+      showToast("Seu navegador bloqueou armazenamento permanente. A sala continua funcionando, mas pode pedir nome novamente ao recarregar.");
     }
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem("card-render-mode", cardRenderMode);
+    setStoredValue("card-render-mode", cardRenderMode);
   }, [cardRenderMode]);
 
   const showToast = useCallback((message: string) => {
