@@ -59,6 +59,9 @@ export default function GameCard({
   renderMode = "safe",
 }: GameCardProps) {
   const decoration = card ? CLASS_DECORATION[card.classe] : null;
+  const isLongClassicTitle = Boolean(card && card.titulo.length > 16);
+  const isLongSafeTitle = Boolean(card && card.titulo.length > 16);
+  const isDescriptionLong = Boolean(card && card.descricao.length > 180);
 
   const renderGenericBack = (toneClassName: string) => (
     <div className={`flex h-full flex-col justify-between rounded-md border border-white/10 ${toneClassName} p-2`}>
@@ -120,13 +123,21 @@ export default function GameCard({
                   Custo {card.custo}
                 </span>
               </div>
-              <div className="font-display text-[18px] uppercase tracking-wide text-zinc-900">
+              <div
+                className={`mt-0.5 font-display uppercase tracking-[0.01em] text-zinc-900 ${
+                  isLongClassicTitle ? "text-[16px] leading-[0.78]" : "text-[18px] leading-[0.84]"
+                }`}
+              >
                 {card.titulo}
               </div>
-              <div className="text-[10px] leading-[10px] text-zinc-700">
+                <div
+                  className={`mt-0.5 text-zinc-700 ${
+                    isDescriptionLong ? "text-[10px] leading-[0.96]" : "text-[12px] leading-[0.96]"
+                  }`}
+                >
                 {card.descricao}
               </div>
-              <div className="mt-auto text-[6px] uppercase tracking-widest text-zinc-500">
+              <div className="mt-auto text-[6px] uppercase leading-none tracking-widest text-zinc-500">
                 {card.condicao || "Sem condição de ativação"}
               </div>
             </div>
@@ -172,9 +183,9 @@ export default function GameCard({
         }}
       />
       <div className="pointer-events-none absolute inset-0 rounded-lg border border-white/10" />
-      <div className="relative z-10 h-full p-2 text-white">
+      <div className="relative z-10 h-full p-1.5 text-white">
         {card && isFaceUp ? (
-          <div className="flex h-full flex-col gap-1.5 rounded-md border border-white/10 bg-black/20 p-2 backdrop-blur-[1px]">
+          <div className="flex h-full flex-col gap-[3px] rounded-md border border-white/10 bg-black/20 p-1.5 backdrop-blur-[1px]">
             <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-widest text-white/75">
               <span
                 className="rounded-full px-2 py-0.5 text-[10px]"
@@ -186,15 +197,23 @@ export default function GameCard({
                 Custo {card.custo}
               </span>
             </div>
-            <div className="mt-1 flex flex-col gap-0">
-              <div className="min-w-0 font-display text-[19px] uppercase leading-[0.88] tracking-wide text-white">
+            <div className="mt-0.5 flex flex-col gap-0.5">
+              <div
+                className={`min-w-0 max-w-[92%] font-display uppercase tracking-[0.01em] text-white ${
+                  isLongSafeTitle ? "text-[14px] leading-[0.7]" : "text-[18px] leading-[0.84]"
+                }`}
+              >
                 {card.titulo}
               </div>
               <div className="text-left text-[6px] uppercase leading-none tracking-widest text-white/55">
                 {card.condicao || "Sem condição de ativação"}
               </div>
             </div>
-            <div className="text-[10px] leading-[10px] text-white/80">
+            <div
+              className={`max-w-[96%] text-white/80 ${
+                isDescriptionLong ? "text-[10px] leading-[0.92]" : "text-[12px] leading-[0.9]"
+              }`}
+            >
               {card.descricao}
             </div>
           </div>

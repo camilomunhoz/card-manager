@@ -1,3 +1,5 @@
+import { getStoredValue, setStoredValue } from "@/lib/browserStorage";
+
 const PLAYER_KEY = "card-arena-player-id";
 const PLAYER_NAME_KEY = "card-arena-player-name";
 const PLAYER_COLOR_KEY = "card-arena-player-color";
@@ -26,29 +28,29 @@ const generateUUID = () => {
 
 export const getOrCreatePlayerId = () => {
   if (typeof window === "undefined") return "";
-  const existing = window.localStorage.getItem(PLAYER_KEY);
+  const existing = getStoredValue(PLAYER_KEY);
   if (existing) return existing;
   const id = generateUUID();
-  window.localStorage.setItem(PLAYER_KEY, id);
+  setStoredValue(PLAYER_KEY, id);
   return id;
 };
 
 export const getStoredPlayerName = () => {
   if (typeof window === "undefined") return "";
-  return window.localStorage.getItem(PLAYER_NAME_KEY) || "";
+  return getStoredValue(PLAYER_NAME_KEY);
 };
 
 export const setStoredPlayerName = (name: string) => {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(PLAYER_NAME_KEY, name);
+  setStoredValue(PLAYER_NAME_KEY, name);
 };
 
 export const getStoredPlayerColor = () => {
   if (typeof window === "undefined") return "";
-  return window.localStorage.getItem(PLAYER_COLOR_KEY) || "";
+  return getStoredValue(PLAYER_COLOR_KEY);
 };
 
 export const setStoredPlayerColor = (color: string) => {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(PLAYER_COLOR_KEY, color);
+  setStoredValue(PLAYER_COLOR_KEY, color);
 };
